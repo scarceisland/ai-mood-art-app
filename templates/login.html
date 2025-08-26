@@ -1,29 +1,83 @@
 {% extends "base.html" %}
 {% block content %}
+
 <h1>Welcome</h1>
-<p class="muted">Use one of the preset credentials to sign in and test.</p>
+<p class="muted">Select a preset username and its matching password from the dropdowns, then click Login.</p>
 
 <div class="grid">
-  <form method="post" action="{{ url_for('main.login') }}">
+  <form method="post" action="{{ url_for('main.login') }}" autocomplete="off" spellcheck="false">
     <h2>Sign in</h2>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+    <!-- USERNAME: dropdown -->
     <label>Username</label>
-    <input type="text" name="username" placeholder="admin, user1 ... user9" required>
+    <select id="usernameSelect" name="username" required>
+      <option value="" selected disabled>Choose a username…</option>
+      <option value="admin">admin</option>
+      {% for i in range(1,10) %}
+      <option value="user{{i}}">user{{i}}</option>
+      {% endfor %}
+    </select>
+
+    <!-- PASSWORD: dropdown (enabled after username is chosen) -->
     <label>Password</label>
-    <input type="password" name="password" placeholder="admin123 or pass1..pass9" required>
+    <select id="passwordSelect" name="password" required disabled>
+      <option value="" selected disabled>Choose the password…</option>
+      <!-- a single, matching password option will be injected by JS -->
+    </select>
+
     <div class="spacer"></div>
-    <button type="submit">Login</button>
+    <button type="submit" id="loginBtn">Login</button>
+
+    <noscript>
+      <p class="error" style="margin-top:10px">JavaScript is required to select the matching password.</p>
+    </noscript>
   </form>
 
-  <div>
-    <h2>Test Accounts</h2>
-    <table>
-      <tr><th>User</th><th>Password</th><th>Role</th></tr>
-      <tr><td>admin</td><td>admin123</td><td>Admin</td></tr>
-      {% for i in range(1,10) %}
-      <tr><td>user{{i}}</td><td>pass{{i}}</td><td>General</td></tr>
-      {% endfor %}
-    </table>
-  </div>
+  <!-- (Right column intentionally left empty — we removed the visible table of test accounts.) -->
+  <div></div>
 </div>
+
+<script>
+  // Build the credentials map in JS (localhost demo)
+  const CREDS = [{ u: 'admin', p: 'admin123' }];
+  for (let i = 1; i <= 9; i++) CREDS.push({ u: `user${i}`, p: `pass${i}` });
+
+  const usernameSelect = document.getElementById('usernameSelect');
+  const passwordSelect = document.getElementById('passwordSelect');
+
+  function clearPasswordOptions() {
+    passwordSelect.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Choose the password…';
+    opt.disabled = true;
+    opt.selected = true;
+    passwordSelect.appendChild(opt);
+  }
+
+  function setPasswordForUser(user) {
+    clearPasswordOptions();
+    const match = CREDS.find(c => c.u === user);
+    if (match) {
+      const o = document.createElement('option');
+      o.value = match.p;        // this is the actual password value sent to the server
+      o.textContent = match.p;  // shown when the dropdown opens
+      passwordSelect.appendChild(o);
+      passwordSelect.disabled = false;
+      passwordSelect.focus();
+    } else {
+      passwordSelect.disabled = true;
+    }
+  }
+
+  // Initialize password field clean
+  clearPasswordOptions();
+  passwordSelect.disabled = true;
+
+  usernameSelect.addEventListener('change', (e) => {
+    setPasswordForUser(e.target.value);
+  });
+</script>
+
 {% endblock %}
