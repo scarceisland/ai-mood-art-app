@@ -7,6 +7,7 @@ h1{font-size:28px;margin:0 0 8px}
 h2{font-size:20px;margin:16px 0 8px}
 p.muted{color:var(--muted)}
 label{display:block;margin:12px 0 6px}
+select:disabled { opacity: .7; cursor: not-allowed; }
 input[type=text], input[type=password], select, textarea {
   width:100%; padding:12px 14px; border-radius:12px; border:1px solid #2a3142; background:#111421; color:var(--text);
 }
