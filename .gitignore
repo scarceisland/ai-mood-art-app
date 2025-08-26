@@ -1,0 +1,7 @@
+.env
+venv/
+__pycache__/
+*.pyc
+*.db
+data/session_log.csv
+data/session_log.jsonl
