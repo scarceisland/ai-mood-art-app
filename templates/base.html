@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mood → Art (Local Demo)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+  <!-- HTMX CDN -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar card">
+      <div class="chip">Mood → Art (Local)</div>
+      <div class="right">
+        {% if session.username %}
+          <span class="chip">Signed in: {{ session.username }}</span>
+          {% if session.username == 'admin' %}
+            <a class="chip" href="{{ url_for('main.admin') }}">Admin</a>
+          {% endif %}
+          <a href="{{ url_for('main.logout') }}"><button class="secondary">Logout</button></a>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      {% block content %}{% endblock %}
+    </div>
+
+    <div class="footer">Images: Pollinations (no key) • Data: SQLite in /data • HTMX for no-reload actions</div>
+  </div>
+
+  <!-- Optional: show spinner while HTMX requests run -->
+  <script>
+    document.body.addEventListener('htmx:configRequest', (evt) => {
+      // could add headers/token here if needed
+    });
+  </script>
+</body>
+</html>

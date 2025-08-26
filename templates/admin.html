@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin: Feedback</h1>
+<p class="muted">View and export collected feedback.</p>
+<div class="row">
+  <div><a href="{{ url_for('main.export_feedback') }}"><button>Download CSV</button></a></div>
+  <div><a href="{{ url_for('main.admin_logs') }}"><button class="secondary">View Logs</button></a></div>
+</div>
+<div class="spacer"></div>
+<table>
+  <tr>
+    <th>#</th><th>When</th><th>User</th><th>Emotion</th><th>Prompt</th>
+    <th>Matched?</th><th>Advice OK?</th><th>Advice</th><th>Image</th><th>Comments</th>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.id }}</td>
+    <td>{{ r.created_at }}</td>
+    <td>{{ r.username }}</td>
+    <td>{{ r.emotion }}</td>
+    <td>{{ r.prompt }}</td>
+    <td>{{ 'Yes' if r.predicted_correct else 'No' }}</td>
+    <td>{{ 'Yes' if r.advice_ok else 'No' }}</td>
+    <td>{{ r.advice }}</td>
+    <td><a href="{{ r.image_url }}" target="_blank">open</a></td>
+    <td>{{ r.comments or '' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

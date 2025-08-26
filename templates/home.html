@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Generate Mood-Matched Art</h1>
+<p class="muted">Pick an emotion, add a short description (optional), and we’ll render an image + a tiny tip.</p>
+
+<form
+  hx-post="{{ url_for('main.generate') }}"
+  hx-target="#result"
+  hx-swap="innerHTML"
+  hx-indicator="#spinner"
+>
+  <div class="row">
+    <div class="col">
+      <label>Emotion (required)</label>
+      <select name="emotion" required>
+        <option value="">-- choose mood --</option>
+        {% for e in emotions %}
+          <option value="{{e}}">{{ e|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col">
+      <label>Short prompt (optional, 3–15 words)</label>
+      <input type="text" name="prompt" maxlength="120" placeholder="e.g., bright morning after good news">
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <button type="submit">Generate</button>
+  <img id="spinner" class="spinner" src="{{ url_for('static', filename='images/spinner.gif') }}" alt="loading" />
+</form>
+
+<hr>
+
+<div id="result"><!-- HTMX swaps the result card here --></div>
+{% endblock %}

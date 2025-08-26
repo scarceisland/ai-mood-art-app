@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin: Session Logs</h1>
+<p class="muted">
+  Viewing {{ source|upper }} log • {{ total }} entries • Page {{ page }} of {{ pages }}
+</p>
+
+<form method="get" action="{{ url_for('main.admin_logs') }}" class="row" style="align-items:flex-end">
+  <div class="col">
+    <label>Source</label>
+    <select name="source">
+      <option value="auto" {% if source=='auto' %}selected{% endif %}>auto (prefers JSONL, falls back to CSV)</option>
+      <option value="jsonl" {% if source=='jsonl' %}selected{% endif %}>jsonl</option>
+      <option value="csv" {% if source=='csv' %}selected{% endif %}>csv</option>
+    </select>
+  </div>
+  <div class="col">
+    <label>Filter by event (optional)</label>
+    <input type="text" name="event" value="{{ event or '' }}" placeholder="e.g., login_success">
+  </div>
+  <div class="col">
+    <button type="submit">Apply</button>
+    <a href="{{ url_for('main.admin_logs_download', source=source if source!='auto' else 'jsonl') }}"><button class="secondary" type="button">Download raw</button></a>
+  </div>
+</form>
+
+<div class="spacer"></div>
+
+<table>
+  <tr>
+    <th>Timestamp</th>
+    <th>Event</th>
+    <th>User</th>
+    <th>Data</th>
+  </tr>
+  {% for row in rows %}
+  <tr>
+    <td>{{ row.ts }}</td>
+    <td>{{ row.event }}</td>
+    <td>{{ row.user }}</td>
+    <td><pre style="white-space:pre-wrap;margin:0">{{ row.data }}</pre></td>
+  </tr>
+  {% endfor %}
+</table>
+
+<div class="row" style="justify-content:space-between; margin-top:12px">
+  {% if page > 1 %}
+    <a href="{{ url_for('main.admin_logs', page=page-1, source=source, event=event) }}"><button class="secondary">← Previous</button></a>
+  {% else %}
+    <span></span>
+  {% endif %}
+
+  {% if page < pages %}
+    <a href="{{ url_for('main.admin_logs', page=page+1, source=source, event=event) }}"><button>Next →</button></a>
+  {% endif %}
+</div>
+{% endblock %}
