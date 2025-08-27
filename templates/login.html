@@ -2,28 +2,36 @@
 {% block content %}
 
 <h1>Welcome</h1>
-<p class="muted">Select a preset username and its matching password from the dropdowns, then click Login.</p>
+<p class="muted">Start typing a username and pick it from the suggestions, then select the matching password and click Login.</p>
 
 <div class="grid">
   <form method="post" action="{{ url_for('main.login') }}" autocomplete="off" spellcheck="false">
     <h2>Sign in</h2>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
 
-    <!-- USERNAME: dropdown -->
+    <!-- USERNAME: typeahead via datalist -->
     <label>Username</label>
-    <select id="usernameSelect" name="username" required>
-      <option value="" selected disabled>Choose a username…</option>
-      <option value="admin">admin</option>
+    <input
+      id="usernameInput"
+      name="username"
+      list="userOptions"
+      placeholder="Start typing… e.g., user3"
+      required
+      inputmode="text"
+      pattern="admin|user[1-9]"
+    >
+    <datalist id="userOptions">
+      <option value="admin"></option>
       {% for i in range(1,10) %}
-      <option value="user{{i}}">user{{i}}</option>
+      <option value="user{{i}}"></option>
       {% endfor %}
-    </select>
+    </datalist>
 
-    <!-- PASSWORD: dropdown (enabled after username is chosen) -->
+    <!-- PASSWORD: dropdown (enabled only after a valid username is chosen) -->
     <label>Password</label>
     <select id="passwordSelect" name="password" required disabled>
       <option value="" selected disabled>Choose the password…</option>
-      <!-- a single, matching password option will be injected by JS -->
+      <!-- Will be filled by JS with the single matching password -->
     </select>
 
     <div class="spacer"></div>
@@ -34,17 +42,19 @@
     </noscript>
   </form>
 
-  <!-- (Right column intentionally left empty — we removed the visible table of test accounts.) -->
+  <!-- Right column left empty (we removed the visible table of test accounts) -->
   <div></div>
 </div>
 
 <script>
-  // Build the credentials map in JS (localhost demo)
+  // Localhost demo credentials (front-end only for convenience)
   const CREDS = [{ u: 'admin', p: 'admin123' }];
   for (let i = 1; i <= 9; i++) CREDS.push({ u: `user${i}`, p: `pass${i}` });
+  const ALLOWED_USERS = new Set(CREDS.map(c => c.u));
 
-  const usernameSelect = document.getElementById('usernameSelect');
+  const usernameInput  = document.getElementById('usernameInput');
   const passwordSelect = document.getElementById('passwordSelect');
+  const form           = document.querySelector('form');
 
   function clearPasswordOptions() {
     passwordSelect.innerHTML = '';
@@ -61,8 +71,8 @@
     const match = CREDS.find(c => c.u === user);
     if (match) {
       const o = document.createElement('option');
-      o.value = match.p;        // this is the actual password value sent to the server
-      o.textContent = match.p;  // shown when the dropdown opens
+      o.value = match.p;        // will be submitted to server
+      o.textContent = match.p;  // shows in dropdown
       passwordSelect.appendChild(o);
       passwordSelect.disabled = false;
       passwordSelect.focus();
@@ -71,12 +81,32 @@
     }
   }
 
-  // Initialize password field clean
+  function validateAndSet() {
+    const user = (usernameInput.value || '').trim();
+    if (ALLOWED_USERS.has(user)) {
+      setPasswordForUser(user);
+    } else {
+      clearPasswordOptions();
+      passwordSelect.disabled = true;
+    }
+  }
+
+  // Init
   clearPasswordOptions();
   passwordSelect.disabled = true;
 
-  usernameSelect.addEventListener('change', (e) => {
-    setPasswordForUser(e.target.value);
+  // When user types or picks a suggestion
+  usernameInput.addEventListener('input',  validateAndSet);
+  usernameInput.addEventListener('change', validateAndSet);
+
+  // Guard: ensure username is valid before submit
+  form.addEventListener('submit', (e) => {
+    const user = (usernameInput.value || '').trim();
+    if (!ALLOWED_USERS.has(user)) {
+      e.preventDefault();
+      alert('Please choose a valid username from the suggestions.');
+      usernameInput.focus();
+    }
   });
 </script>
 
