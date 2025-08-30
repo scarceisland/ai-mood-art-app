@@ -656,10 +656,10 @@ def admin_dashboard():
     )
 
 
-@bp.get("/admin/export/<export_format>")
+@bp.get("/admin/export/<format>")
 @login_required
 @admin_required
-def export_data(export_format):
+def export_data(format):
     """Export data in various formats."""
     # Get filter parameters
     emotion_filter = request.args.get('emotion')
@@ -678,7 +678,7 @@ def export_data(export_format):
     # Convert to DataFrame
     df = pd.DataFrame([dict(row) for row in data])
 
-    if export_format == 'csv':
+    if format == 'csv':
         output = BytesIO()
         df.to_csv(output, index=False)
         output.seek(0)
@@ -689,7 +689,7 @@ def export_data(export_format):
             download_name='mood_app_data.csv'
         )
 
-    elif export_format == 'excel':
+    elif format == 'excel':
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Generations')
@@ -711,7 +711,7 @@ def export_data(export_format):
             download_name='mood_app_data.xlsx'
         )
 
-    elif export_format == 'pdf':
+    elif format == 'pdf':
         # For PDF, we'll create a simple report
         # In a real implementation, you might use ReportLab or WeasyPrint
         from reportlab.lib.pagesizes import letter
