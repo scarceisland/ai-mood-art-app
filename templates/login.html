@@ -1,113 +1,320 @@
-{% extends "base.html" %}
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AI Art Mood App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            max-width: 450px;
+            overflow: hidden;
+        }
+        
+        .login-header {
+            background: #2c3e50;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .login-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .login-header p {
+            opacity: 0.8;
+        }
+        
+        .login-form {
+            padding: 25px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .input-with-dropdown {
+            position: relative;
+        }
+        
+        .input-with-dropdown input {
+            width: 100%;
+            padding: 14px 45px 14px 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-with-dropdown input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        
+        .dropdown-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7f8c8d;
+            pointer-events: none;
+        }
+        
+        .username-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #3498db;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .username-option {
+            padding: 12px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .username-option:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .password-field {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .password-field:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+        
+        .login-button {
+            width: 100%;
+            padding: 15px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .login-button:hover {
+            background: #2980b9;
+        }
+        
+        .admin-login-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #7f8c8d;
+            text-decoration: none;
+        }
+        
+        .admin-login-link:hover {
+            color: #3498db;
+            text-decoration: underline;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .info-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+        
+        .info-section p {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Welcome</h1>
+            <p>Select your username and enter your password to continue</p>
+        </div>
+        
+        <div class="login-form">
+            {% if error %}
+            <div class="error-message">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+            
+            <form method="post" action="{{ url_for('main.login') }}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <div class="input-with-dropdown">
+                        <input type="text" id="username" name="username" placeholder="Type or select your username" 
+                               autocomplete="username" required value="{{ request.form.username if request.form else '' }}">
+                        <div class="dropdown-icon">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="username-dropdown" id="usernameDropdown">
+                            <div class="username-option" data-username="paul" data-password="paul123">paul</div>
+                            <div class="username-option" data-username="sarah" data-password="sarah123">sarah</div>
+                            <div class="username-option" data-username="john" data-password="john123">john</div>
+                            <div class="username-option" data-username="dana" data-password="dana123">dana</div>
+                            <div class="username-option" data-username="eric" data-password="eric123">eric</div>
+                            <div class="username-option" data-username="fran" data-password="fran123">fran</div>
+                            <div class="username-option" data-username="guest" data-password="guest123">guest</div>
+                            <div class="username-option" data-username="mike" data-password="mike123">mike</div>
+                            <div class="username-option" data-username="lisa" data-password="lisa123">lisa</div>
+                            <div class="username-option" data-username="tom" data-password="tom123">tom</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="password-field" 
+                           placeholder="Enter your password" autocomplete="current-password" required
+                           value="{{ request.form.password if request.form else '' }}">
+                </div>
+                
+                <button type="submit" class="login-button">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+            </form>
+            
+            <a href="{{ url_for('main.admin_login_page') }}" class="admin-login-link">
+                Admin Login
+            </a>
+            
+            <div class="info-section">
+                <p><i class="fas fa-images"></i> Images: Pollinations (no key required)</p>
+                <p><i class="fas fa-database"></i> Data: SQLite database</p>
+                <p><i class="fas fa-bolt"></i> HTMX for seamless interactions</p>
+            </div>
+        </div>
+    </div>
 
-<h1>Welcome</h1>
-<p class="muted">Start typing a username and pick it from the suggestions, then select the matching password and click Login.</p>
-
-<div class="grid">
-  <form method="post" action="{{ url_for('main.login') }}" autocomplete="off" spellcheck="false">
-    <h2>Sign in</h2>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-
-    <!-- USERNAME: typeahead via datalist -->
-    <label>Username</label>
-    <input
-      id="usernameInput"
-      name="username"
-      list="userOptions"
-      placeholder="Start typing… e.g., user3"
-      required
-      inputmode="text"
-      pattern="admin|user[1-9]"
-    >
-    <datalist id="userOptions">
-      <option value="admin"></option>
-      {% for i in range(1,10) %}
-      <option value="user{{i}}"></option>
-      {% endfor %}
-    </datalist>
-
-    <!-- PASSWORD: dropdown (enabled only after a valid username is chosen) -->
-    <label>Password</label>
-    <select id="passwordSelect" name="password" required disabled>
-      <option value="" selected disabled>Choose the password…</option>
-      <!-- Will be filled by JS with the single matching password -->
-    </select>
-
-    <div class="spacer"></div>
-    <button type="submit" id="loginBtn">Login</button>
-
-    <noscript>
-      <p class="error" style="margin-top:10px">JavaScript is required to select the matching password.</p>
-    </noscript>
-  </form>
-
-  <!-- Right column left empty (we removed the visible table of test accounts) -->
-  <div></div>
-</div>
-
-<script>
-  // Localhost demo credentials (front-end only for convenience)
-  const CREDS = [{ u: 'admin', p: 'admin123' }];
-  for (let i = 1; i <= 9; i++) CREDS.push({ u: `user${i}`, p: `pass${i}` });
-  const ALLOWED_USERS = new Set(CREDS.map(c => c.u));
-
-  const usernameInput  = document.getElementById('usernameInput');
-  const passwordSelect = document.getElementById('passwordSelect');
-  const form           = document.querySelector('form');
-
-  function clearPasswordOptions() {
-    passwordSelect.innerHTML = '';
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'Choose the password…';
-    opt.disabled = true;
-    opt.selected = true;
-    passwordSelect.appendChild(opt);
-  }
-
-  function setPasswordForUser(user) {
-    clearPasswordOptions();
-    const match = CREDS.find(c => c.u === user);
-    if (match) {
-      const o = document.createElement('option');
-      o.value = match.p;        // will be submitted to server
-      o.textContent = match.p;  // shows in dropdown
-      passwordSelect.appendChild(o);
-      passwordSelect.disabled = false;
-      passwordSelect.focus();
-    } else {
-      passwordSelect.disabled = true;
-    }
-  }
-
-  function validateAndSet() {
-    const user = (usernameInput.value || '').trim();
-    if (ALLOWED_USERS.has(user)) {
-      setPasswordForUser(user);
-    } else {
-      clearPasswordOptions();
-      passwordSelect.disabled = true;
-    }
-  }
-
-  // Init
-  clearPasswordOptions();
-  passwordSelect.disabled = true;
-
-  // When user types or picks a suggestion
-  usernameInput.addEventListener('input',  validateAndSet);
-  usernameInput.addEventListener('change', validateAndSet);
-
-  // Guard: ensure username is valid before submit
-  form.addEventListener('submit', (e) => {
-    const user = (usernameInput.value || '').trim();
-    if (!ALLOWED_USERS.has(user)) {
-      e.preventDefault();
-      alert('Please choose a valid username from the suggestions.');
-      usernameInput.focus();
-    }
-  });
-</script>
-
-{% endblock %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const usernameDropdown = document.getElementById('usernameDropdown');
+            const usernameOptions = document.querySelectorAll('.username-option');
+            
+            // Show dropdown when username input is focused
+            usernameInput.addEventListener('focus', function() {
+                usernameDropdown.style.display = 'block';
+                filterDropdown('');
+            });
+            
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!usernameInput.contains(e.target) && !usernameDropdown.contains(e.target)) {
+                    usernameDropdown.style.display = 'none';
+                }
+            });
+            
+            // Filter dropdown options based on input
+            usernameInput.addEventListener('input', function() {
+                filterDropdown(this.value);
+            });
+            
+            // Handle selection from dropdown
+            usernameOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    usernameInput.value = this.getAttribute('data-username');
+                    passwordInput.value = this.getAttribute('data-password');
+                    usernameDropdown.style.display = 'none';
+                });
+            });
+            
+            // Filter function for dropdown
+            function filterDropdown(value) {
+                const searchTerm = value.toLowerCase();
+                let hasMatches = false;
+                
+                usernameOptions.forEach(option => {
+                    const username = option.getAttribute('data-username').toLowerCase();
+                    if (username.includes(searchTerm)) {
+                        option.style.display = 'block';
+                        hasMatches = true;
+                    } else {
+                        option.style.display = 'none';
+                    }
+                });
+                
+                // If no matches, show all options
+                if (!hasMatches && searchTerm === '') {
+                    usernameOptions.forEach(option => {
+                        option.style.display = 'block';
+                    });
+                }
+            }
+            
+            // Preserve form values if there was an error
+            {% if error and request.form %}
+                // Show dropdown with filtered results based on current input
+                filterDropdown('{{ request.form.username }}');
+                usernameDropdown.style.display = 'block';
+            {% endif %}
+        });
+    </script>
+</body>
+</html>
