@@ -7,16 +7,11 @@ import datetime as dt
 from collections import Counter
 import pandas as pd
 from io import BytesIO
-from flask import send_file
-import matplotlib
-matplotlib.use('Agg')  # Set non-interactive backend
-import matplotlib.pyplot as plt
-import seaborn as sns
 import requests  # needed for the proxy endpoint
 
 from flask import (
     Blueprint, render_template, request, redirect, url_for,
-    session, send_file, current_app, Response, make_response
+    session, send_file, current_app, Response
 )
 
 from .utils import get_db, login_required, admin_required
@@ -603,9 +598,8 @@ def admin_dashboard():
 
     # Build query
     query = """
-        SELECT f.*, COUNT(fb.id) as feedback_count 
+        SELECT f.*
         FROM feedback f 
-        LEFT JOIN feedback fb ON f.id = fb.id
     """
     conditions = []
     params = []
@@ -619,15 +613,11 @@ def admin_dashboard():
     if emotion_filter:
         conditions.append("f.emotion = ?")
         params.append(emotion_filter)
-    if has_feedback == "1":
-        conditions.append("fb.id IS NOT NULL")
-    elif has_feedback == "0":
-        conditions.append("fb.id IS NULL")
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
-    query += " GROUP BY f.id ORDER BY f.created_at DESC LIMIT 100"
+    query += " ORDER BY f.created_at DESC LIMIT 100"
 
     conn = get_db()
     generations = conn.execute(query, params).fetchall()
@@ -666,10 +656,10 @@ def admin_dashboard():
     )
 
 
-@bp.get("/admin/export/<format>")
+@bp.get("/admin/export/<export_format>")
 @login_required
 @admin_required
-def export_data(format):
+def export_data(export_format):
     """Export data in various formats."""
     # Get filter parameters
     emotion_filter = request.args.get('emotion')
@@ -688,7 +678,7 @@ def export_data(format):
     # Convert to DataFrame
     df = pd.DataFrame([dict(row) for row in data])
 
-    if format == 'csv':
+    if export_format == 'csv':
         output = BytesIO()
         df.to_csv(output, index=False)
         output.seek(0)
@@ -699,7 +689,7 @@ def export_data(format):
             download_name='mood_app_data.csv'
         )
 
-    elif format == 'excel':
+    elif export_format == 'excel':
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Generations')
@@ -721,7 +711,7 @@ def export_data(format):
             download_name='mood_app_data.xlsx'
         )
 
-    elif format == 'pdf':
+    elif export_format == 'pdf':
         # For PDF, we'll create a simple report
         # In a real implementation, you might use ReportLab or WeasyPrint
         from reportlab.lib.pagesizes import letter
