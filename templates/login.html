@@ -158,10 +158,6 @@
             font-size: 16px;
             color: #e0e0e0;
         }
-
-        .hidden {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -174,6 +170,8 @@
         {% endif %}
 
         <form method="post" action="{{ url_for('main.login') }}">
+            <input type="hidden" name="password_select" id="password_select" value="">
+
             <div class="form-group">
                 <label for="username">Username</label>
                 <div class="input-container">
@@ -204,18 +202,12 @@
             <div class="form-group">
                 <label for="password_display">Password</label>
                 <div class="password-display" id="password_display">
-                    {% if request.form and request.form.password %}
+                    {% if request.form and request.form.password_select %}
                         ••••••••
                     {% else %}
                         Select a username first
                     {% endif %}
                 </div>
-                <input
-                    type="hidden"
-                    id="password"
-                    name="password"
-                    value="{{ request.form.password if request.form else '' }}"
-                >
             </div>
 
             <div class="spacer"></div>
@@ -235,7 +227,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
+            const passwordSelect = document.getElementById('password_select');
             const passwordDisplay = document.getElementById('password_display');
             const usernameDropdown = document.getElementById('usernameDropdown');
             const usernameOptions = document.querySelectorAll('.username-option');
@@ -292,10 +284,10 @@
             function updatePasswordForUsername(username) {
                 const normalizedUsername = username.toLowerCase();
                 if (userPasswords[normalizedUsername]) {
-                    passwordInput.value = userPasswords[normalizedUsername];
+                    passwordSelect.value = userPasswords[normalizedUsername];
                     passwordDisplay.textContent = '••••••••';
                 } else {
-                    passwordInput.value = '';
+                    passwordSelect.value = '';
                     passwordDisplay.textContent = 'Select a username first';
                 }
             }
