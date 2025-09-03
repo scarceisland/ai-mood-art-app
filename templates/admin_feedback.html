@@ -1,0 +1,579 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Modal Structure (Initially Hidden) -->
+<div id="feedbackModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <h2>Full Feedback Details</h2>
+        <div id="modal-body">
+            <h4>User</h4>
+            <p id="modal-user"></p>
+            <h4>Emotion</h4>
+            <p id="modal-emotion"></p>
+            <h4>Full Prompt</h4>
+            <p id="modal-prompt"></p>
+            <h4>Full AI Advice</h4>
+            <p id="modal-advice"></p>
+            <h4>Full Comments</h4>
+            <p id="modal-comments"></p>
+        </div>
+    </div>
+</div>
+
+
+<div class="admin-container">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <h2>Admin Panel</h2>
+        <nav class="admin-nav">
+            <a href="{{ url_for('main.admin_dashboard') }}" class="nav-item">Dashboard</a>
+            <a href="{{ url_for('main.admin') }}" class="nav-item active">Feedback</a>
+            <a href="{{ url_for('main.admin_logs') }}" class="nav-item">Logs</a>
+            <a href="#settings" class="nav-item">Settings</a>
+            <a href="{{ url_for('main.logout') }}" class="nav-item logout">Logout</a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="admin-main">
+        <!-- Top Header -->
+        <div class="admin-header">
+            <div class="search-bar">
+                <input type="text" placeholder="Search feedback..." id="feedback-search">
+                <button>🔍</button>
+            </div>
+            <div class="admin-profile">
+                <span>Admin</span>
+                <div class="profile-badge">A</div>
+            </div>
+        </div>
+
+        <!-- Export Buttons -->
+        <div class="export-controls">
+            <h3>Feedback Data</h3>
+            <div class="export-buttons">
+                <a href="{{ url_for('main.export_data', export_format='csv') }}" class="export-btn csv">
+                    📊 Export CSV
+                </a>
+                <a href="{{ url_for('main.export_data', export_format='excel') }}" class="export-btn excel">
+                    📈 Export Excel
+                </a>
+                <a href="{{ url_for('main.export_data', export_format='pdf') }}" class="export-btn pdf">
+                    📄 Export PDF
+                </a>
+            </div>
+        </div>
+
+        <!-- Feedback Table -->
+        <div class="admin-section">
+            <div class="section-header">
+                <h3>All Feedback <small>(Click on a row to see full details)</small></h3>
+                <div class="filter-controls">
+                    <select id="emotion-filter">
+                        <option value="">All Emotions</option>
+                        <option value="happiness">Happiness</option>
+                        <option value="sadness">Sadness</option>
+                        <option value="anger">Anger</option>
+                        <option value="disgust">Disgust</option>
+                        <option value="fear">Fear</option>
+                        <option value="surprise">Surprise</option>
+                    </select>
+                    <select id="date-filter">
+                        <option value="">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Emotion</th>
+                            <th>Prompt</th>
+                            <th>AI Advice</th>
+                            <th>Match Mood?</th>
+                            <th>Helpful Advice?</th>
+                            <th>Comments</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for feedback in feedback_data %}
+                        <!-- MODIFICATION: Added data-* attributes and onclick event to the table row -->
+                        <tr class="clickable-row"
+                            data-user="{{ feedback.username }}"
+                            data-emotion="{{ feedback.emotion }}"
+                            data-prompt="{{ feedback.prompt }}"
+                            data-advice="{{ feedback.advice }}"
+                            data-comments="{{ feedback.comments }}"
+                            onclick="openModal(this)">
+                            <td>{{ feedback.username }}</td>
+                            <td><span class="emotion-badge {{ feedback.emotion }}">{{ feedback.emotion }}</span></td>
+                            <td class="truncate-text" title="{{ feedback.prompt }}">{{ feedback.prompt|truncate(30) }}</td>
+                            <td class="truncate-text" title="{{ feedback.advice }}">{{ feedback.advice|truncate(30) }}</td>
+                            <td>
+                                <span class="status-badge {{ 'yes' if feedback.predicted_correct else 'no' }}">
+                                    {{ 'Yes' if feedback.predicted_correct else 'No' }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge {{ 'yes' if feedback.advice_ok else 'no' }}">
+                                    {{ 'Yes' if feedback.advice_ok else 'No' }}
+                                </span>
+                            </td>
+                            <td class="truncate-text" title="{{ feedback.comments }}">{{ feedback.comments|truncate(20) if feedback.comments else '-' }}</td>
+                            <td>{{ feedback.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+            <!-- Emotion Distribution -->
+            <div class="chart-card">
+                <h4>Emotion Distribution</h4>
+                <canvas id="emotionChart"></canvas>
+                <div class="chart-controls">
+                    <select id="emotionChartType">
+                        <option value="pie">Pie Chart</option>
+                        <option value="bar">Bar Chart</option>
+                        <option value="doughnut">Doughnut Chart</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Feedback Ratings -->
+            <div class="chart-card">
+                <h4>Feedback Ratings</h4>
+                <canvas id="ratingChart"></canvas>
+                <div class="chart-controls">
+                    <select id="ratingChartType">
+                        <option value="bar">Bar Chart</option>
+                        <option value="polarArea">Polar Area</option>
+                        <option value="radar">Radar Chart</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Daily Activity -->
+            <div class="chart-card">
+                <h4>Daily Feedback Activity</h4>
+                <canvas id="activityChart"></canvas>
+                <div class="chart-controls">
+                    <select id="activityChartType">
+                        <option value="line">Line Chart</option>
+                        <option value="bar">Bar Chart</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exit Button -->
+        <div class="exit-section">
+            <a href="{{ url_for('main.entry') }}" class="exit-btn">← Exit to Landing Page</a>
+        </div>
+    </div>
+</div>
+
+<style>
+/* NEW: Styles for Modal Popup */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.6);
+}
+
+.modal-content {
+    background-color: #3a3a3a;
+    margin: 10% auto;
+    padding: 20px 30px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 600px;
+    color: #e0e0e0;
+    position: relative;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.close-btn {
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+    color: #fff;
+}
+
+#modal-body h4 {
+    color: #6b8cff;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #4a4a4a;
+    padding-bottom: 4px;
+}
+
+#modal-body p {
+    margin-top: 5px;
+    line-height: 1.6;
+    white-space: pre-wrap; /* Allows text with line breaks to wrap */
+    word-wrap: break-word;
+}
+
+
+/* NEW: Style for clickable table rows */
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.clickable-row:hover {
+    background-color: #383838;
+}
+
+/* --- Existing Styles --- */
+.export-controls {
+    background: #2d2d2d;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.export-controls h3 { margin: 0; }
+.export-buttons { display: flex; gap: 10px; }
+.export-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    text-decoration: none;
+    color: white;
+    font-weight: 500;
+    transition: transform 0.2s;
+}
+.export-btn.csv { background: #00c853; }
+.export-btn.excel { background: #2196f3; }
+.export-btn.pdf { background: #ff5252; }
+.export-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.chart-card { background: #2d2d2d; padding: 20px; border-radius: 8px; }
+.chart-card h4 { margin-bottom: 15px; text-align: center; }
+.chart-controls { margin-top: 15px; text-align: center; }
+.chart-controls select {
+    padding: 8px 12px;
+    background: #3d3d3d;
+    border: 1px solid #4d4d4d;
+    border-radius: 4px;
+    color: #e0e0e0;
+}
+.emotion-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+.emotion-badge.happiness { background: #ffd54f; color: #333; }
+.emotion-badge.sadness { background: #64b5f6; color: white; }
+.emotion-badge.anger { background: #e57373; color: white; }
+.emotion-badge.disgust { background: #81c784; color: white; }
+.emotion-badge.fear { background: #ba68c8; color: white; }
+.emotion-badge.surprise { background: #ffb74d; color: #333; }
+.truncate-text {
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.status-badge.yes { background: #00c853; color: white; }
+.status-badge.no { background: #ff5252; color: white; }
+.table-container { overflow-x: auto; max-height: 400px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.admin-table th { position: sticky; top: 0; background: #3d3d3d; z-index: 10; }
+</style>
+
+<!-- FIX: Add Chart.js library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Initialize charts when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // FIX: Safely parse data directly from Flask render
+    const chartData = {
+        emotions: {{ emotion_data|tojson|safe }},
+        ratings: {{ rating_data|tojson|safe }},
+        activity: {{ activity_data|tojson|safe }}
+    };
+
+    // Initialize charts and store their data/options
+    initEmotionChart(chartData);
+    initRatingChart(chartData);
+    initActivityChart(chartData);
+
+    // Add event listeners for chart type changes
+    document.getElementById('emotionChartType').addEventListener('change', () => updateEmotionChart());
+    document.getElementById('ratingChartType').addEventListener('change', () => updateRatingChart());
+    document.getElementById('activityChartType').addEventListener('change', () => updateActivityChart());
+
+    // Add search functionality
+    document.getElementById('feedback-search').addEventListener('input', filterFeedback);
+    document.getElementById('emotion-filter').addEventListener('change', filterFeedback);
+    document.getElementById('date-filter').addEventListener('change', filterFeedback);
+
+    // Modal event listeners
+    const modal = document.getElementById('feedbackModal');
+    const closeBtn = document.querySelector('.close-btn');
+    closeBtn.onclick = closeModal;
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            closeModal();
+        }
+    };
+});
+
+// Store chart data and options for later use
+let emotionChartConfig = {};
+let ratingChartConfig = {};
+let activityChartConfig = {};
+
+// --- Modal Functions ---
+function openModal(rowElement) {
+    // Get data from the clicked row's data-* attributes
+    const user = rowElement.dataset.user;
+    const emotion = rowElement.dataset.emotion;
+    const prompt = rowElement.dataset.prompt;
+    const advice = rowElement.dataset.advice;
+    const comments = rowElement.dataset.comments || "No comments provided.";
+
+    // Populate the modal with the data
+    document.getElementById('modal-user').textContent = user;
+    document.getElementById('modal-emotion').textContent = emotion;
+    document.getElementById('modal-prompt').textContent = prompt;
+    document.getElementById('modal-advice').textContent = advice;
+    document.getElementById('modal-comments').textContent = comments;
+
+    // Show the modal
+    document.getElementById('feedbackModal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('feedbackModal').style.display = 'none';
+}
+
+// --- Chart Functions ---
+function initEmotionChart(chartData) {
+    const ctx = document.getElementById('emotionChart').getContext('2d');
+    const total = chartData.emotions.values.reduce((acc, val) => acc + val, 0);
+
+    // Store data and options for later use
+    emotionChartConfig = {
+        type: 'pie',
+        data: {
+            labels: chartData.emotions.labels,
+            datasets: [{
+                data: chartData.emotions.values,
+                backgroundColor: ['#ffd54f', '#64b5f6', '#e57373', '#81c784', '#ba68c8', '#ffb74d']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed;
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    window.emotionChart = new Chart(ctx, emotionChartConfig);
+}
+
+function initRatingChart(chartData) {
+    const ctx = document.getElementById('ratingChart').getContext('2d');
+
+    // Store data and options for later use
+    ratingChartConfig = {
+        type: 'bar',
+        data: {
+            labels: ['Mood Match', 'Advice Helpful'],
+            datasets: [{
+                label: 'Yes',
+                data: [chartData.ratings.mood_yes, chartData.ratings.advice_yes],
+                backgroundColor: '#00c853'
+            }, {
+                label: 'No',
+                data: [chartData.ratings.mood_no, chartData.ratings.advice_no],
+                backgroundColor: '#ff5252'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+        }
+    };
+
+    window.ratingChart = new Chart(ctx, ratingChartConfig);
+}
+
+function initActivityChart(chartData) {
+    const ctx = document.getElementById('activityChart').getContext('2d');
+
+    // Store data and options for later use
+    activityChartConfig = {
+        type: 'line',
+        data: {
+            labels: chartData.activity.labels,
+            datasets: [{
+                label: 'Feedback Submissions',
+                data: chartData.activity.values,
+                borderColor: '#6b8cff',
+                backgroundColor: 'rgba(107, 140, 255, 0.1)',
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+        }
+    };
+
+    window.activityChart = new Chart(ctx, activityChartConfig);
+}
+
+function updateEmotionChart() {
+    const chartType = document.getElementById('emotionChartType').value;
+    if (window.emotionChart) {
+        window.emotionChart.destroy();
+    }
+
+    const ctx = document.getElementById('emotionChart').getContext('2d');
+
+    // Create a new config with the updated chart type
+    const newConfig = {
+        ...emotionChartConfig,
+        type: chartType
+    };
+
+    window.emotionChart = new Chart(ctx, newConfig);
+}
+
+function updateRatingChart() {
+    const chartType = document.getElementById('ratingChartType').value;
+    if (window.ratingChart) {
+        window.ratingChart.destroy();
+    }
+
+    const ctx = document.getElementById('ratingChart').getContext('2d');
+
+    // Create a new config with the updated chart type
+    const newConfig = {
+        ...ratingChartConfig,
+        type: chartType
+    };
+
+    window.ratingChart = new Chart(ctx, newConfig);
+}
+
+function updateActivityChart() {
+    const chartType = document.getElementById('activityChartType').value;
+    if (window.activityChart) {
+        window.activityChart.destroy();
+    }
+
+    const ctx = document.getElementById('activityChart').getContext('2d');
+
+    // Create a new config with the updated chart type
+    const newConfig = {
+        ...activityChartConfig,
+        type: chartType
+    };
+
+    window.activityChart = new Chart(ctx, newConfig);
+}
+
+function filterFeedback() {
+    const searchTerm = document.getElementById('feedback-search').value.toLowerCase();
+    const emotionFilter = document.getElementById('emotion-filter').value;
+    const dateFilter = document.getElementById('date-filter').value;
+
+    const rows = document.querySelectorAll('.admin-table tbody tr');
+
+    rows.forEach(row => {
+        const username = row.cells[0].textContent.toLowerCase();
+        const emotion = row.cells[1].textContent.toLowerCase();
+        const prompt = row.cells[2].getAttribute('title').toLowerCase();
+        const dateString = row.cells[7].textContent;
+
+        const matchesSearch = username.includes(searchTerm) || prompt.includes(searchTerm);
+        const matchesEmotion = !emotionFilter || emotion === emotionFilter;
+        const matchesDate = filterByDate(dateString, dateFilter);
+
+        row.style.display = (matchesSearch && matchesEmotion && matchesDate) ? '' : 'none';
+    });
+}
+
+function filterByDate(dateString, filterType) {
+    if (!filterType) return true;
+
+    // Parse date in dd/mm/yyyy format
+    const parts = dateString.split(' ')[0].split('/');
+    if (parts.length !== 3) return true;
+    const date = new Date(parts[2], parts[1] - 1, parts[0]);
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    switch(filterType) {
+        case 'today':
+            return date.getTime() === today.getTime();
+        case 'week':
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            return date >= weekStart;
+        case 'month':
+            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        default:
+            return true;
+    }
+}
+</script>
+
+{% endblock %}
