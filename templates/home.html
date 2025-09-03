@@ -1,35 +1,165 @@
 {% extends "base.html" %}
 {% block content %}
+
+<!--suppress SpellCheckingInspection -->
+
 <h1>Generate Mood-Matched Art</h1>
-<p class="muted">Pick an emotion, add a short description (optional), and we’ll render an image + a tiny tip.</p>
+<p class="muted">Pick an emotion, add a short description (optional), and we'll render an image + a tiny tip.</p>
 
 <form
   hx-post="{{ url_for('main.generate') }}"
   hx-target="#result"
   hx-swap="innerHTML"
-  hx-indicator="#spinner"
+  hx-indicator="#global-spinner"
+  id="generate-form"
 >
   <div class="row">
     <div class="col">
       <label>Emotion (required)</label>
-      <select name="emotion" required>
+      <select name="emotion" id="emotion-select" required>
         <option value="">-- choose mood --</option>
         {% for e in emotions %}
-          <option value="{{e}}">{{ e|capitalize }}</option>
+          <option value="{{ e }}">{{ e|capitalize }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="col">
       <label>Short prompt (optional, 3–15 words)</label>
-      <input type="text" name="prompt" maxlength="120" placeholder="e.g., bright morning after good news">
+      <input type="text" name="prompt" id="prompt-input" maxlength="120" placeholder="e.g., bright morning after good news">
     </div>
   </div>
+
   <div class="spacer"></div>
-  <button type="submit">Generate</button>
-  <img id="spinner" class="spinner" src="{{ url_for('static', filename='images/spinner.gif') }}" alt="loading" />
+  <button type="submit" id="generate-btn">
+    <span id="btn-text">Generate</span>
+    <span id="btn-loading" style="display: none;">
+      <div class="spinner small"></div> Generating...
+    </span>
+  </button>
 </form>
 
 <hr>
 
 <div id="result"><!-- HTMX swaps the result card here --></div>
+
+<!-- Global HTMX spinner overlay -->
+<div id="global-spinner" aria-live="polite" aria-busy="true" style="display:none">
+  <div class="spinner" role="status"></div>
+  <p>Generating your art... This may take 10-20 seconds</p>
+</div>
+
+<style>
+/* Add these styles for better loading states */
+#global-spinner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  color: white;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #6b8cff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 10px;
+}
+
+.spinner.small {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.img-spinner {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+}
+
+.img-fallback {
+  text-align: center;
+  padding: 20px;
+  background: #5e2a2a;
+  border-radius: 4px;
+  margin: 10px 0;
+}
+
+.img-fallback button {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background: #ff5252;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.img-fallback button:hover {
+  background: #e04444;
+}
+</style>
+
+<script>
+  // Enhanced form handling with better loading states
+  document.getElementById('generate-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // Show loading state on button
+    document.getElementById('btn-text').style.display = 'none';
+    document.getElementById('btn-loading').style.display = 'inline';
+    document.getElementById('generate-btn').disabled = true;
+
+    // Show global spinner
+    document.getElementById('global-spinner').style.display = 'flex';
+  });
+
+  // Show/hide spinner during HTMX requests
+  document.addEventListener('htmx:beforeRequest', function(evt) {
+    if (evt.detail.elt.id === 'generate-form') {
+      document.getElementById('global-spinner').style.display = 'flex';
+    }
+  });
+
+  document.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.elt.id === 'generate-form') {
+      document.getElementById('global-spinner').style.display = 'none';
+
+      // Reset button state
+      document.getElementById('btn-text').style.display = 'inline';
+      document.getElementById('btn-loading').style.display = 'none';
+      document.getElementById('generate-btn').disabled = false;
+
+      // Log response for debugging
+      console.log("Status:", evt.detail.successful ? "OK" : "Failed");
+      if (!evt.detail.successful) {
+        console.error("Error:", evt.detail.xhr.responseText);
+      }
+    }
+  });
+
+  // Handle request errors
+  document.addEventListener('htmx:responseError', function(evt) {
+    if (evt.detail.elt.id === 'generate-form') {
+      console.error("Request failed:", evt.detail.xhr.status, evt.detail.xhr.responseText);
+      alert("Sorry, the image generation failed. Please try again.");
+    }
+  });
+</script>
+
 {% endblock %}
