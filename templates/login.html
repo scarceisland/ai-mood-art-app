@@ -170,7 +170,7 @@
         {% endif %}
 
         <form method="post" action="{{ url_for('main.login') }}">
-            <input type="hidden" name="password_select" id="password_select" value="">
+            <input type="hidden" name="password" id="password_select" value="">
 
             <div class="form-group">
                 <label for="username">Username</label>
@@ -200,16 +200,15 @@
             </div>
 
             <div class="form-group">
-                <label for="password_display">Password</label>
-                <div class="password-display" id="password_display">
-                    {% if request.form and request.form.password_select %}
-                        ••••••••
-                    {% else %}
-                        Select a username first
-                    {% endif %}
-                </div>
-            </div>
-
+    <label for="password_display">Password</label>
+    <div class="password-display" id="password_display">
+        {% if request.form and request.form.password_select %}
+            ••••••••
+        {% else %}
+            Select a username first
+        {% endif %}
+    </div>
+</div>
             <div class="spacer"></div>
 
             <button type="submit">Login</button>
@@ -225,93 +224,167 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {
+        const usernameInput = document.getElementById('username');
+        const passwordSelect = document.getElementById('password_select');
+        const passwordDisplay = document.getElementById('password_display');
+        const usernameDropdown = document.getElementById('usernameDropdown');
+        const usernameOptions = document.querySelectorAll('.username-option');
+
+        // Username to password mapping
+        const userPasswords = {
+            'paul': 'paul123',
+            'sarah': 'sarah123',
+            'john': 'john123',
+            'dana': 'dana123',
+            'eric': 'eric123',
+            'fran': 'fran123',
+            'guest': 'guest123',
+            'mike': 'mike123',
+            'lisa': 'lisa123',
+            'tom': 'tom123'
+        };
+
+        // Show dropdown when username input is focused
+        usernameInput.addEventListener('focus', function() {
+            usernameDropdown.style.display = 'block';
+            filterDropdown('');
+        });
+
+        // Hide dropdown when clicking outside - FIXED
+        document.addEventListener('click', function(e) {
             const usernameInput = document.getElementById('username');
-            const passwordSelect = document.getElementById('password_select');
-            const passwordDisplay = document.getElementById('password_display');
             const usernameDropdown = document.getElementById('usernameDropdown');
-            const usernameOptions = document.querySelectorAll('.username-option');
 
-            // Username to password mapping
-            const userPasswords = {
-                'paul': 'paul123',
-                'sarah': 'sarah123',
-                'john': 'john123',
-                'dana': 'dana123',
-                'eric': 'eric123',
-                'fran': 'fran123',
-                'guest': 'guest123',
-                'mike': 'mike123',
-                'lisa': 'lisa123',
-                'tom': 'tom123'
-            };
-
-            // Show dropdown when username input is focused
-            usernameInput.addEventListener('focus', function() {
-                usernameDropdown.style.display = 'block';
-                filterDropdown('');
-            });
-
-            // Hide dropdown when clicking outside
-            document.addEventListener('click', function(e) {
+            if (usernameInput && usernameDropdown) {
                 if (!usernameInput.contains(e.target) && !usernameDropdown.contains(e.target)) {
                     usernameDropdown.style.display = 'none';
                 }
-            });
-
-            // Filter dropdown options based on input
-            usernameInput.addEventListener('input', function() {
-                filterDropdown(this.value);
-                updatePasswordForUsername(this.value);
-            });
-
-            // Handle selection from dropdown
-            usernameOptions.forEach(option => {
-                option.addEventListener('click', function() {
-                    const username = this.getAttribute('data-username');
-                    usernameInput.value = username;
-                    updatePasswordForUsername(username);
-                    usernameDropdown.style.display = 'none';
-                });
-            });
-
-            // Update password when username changes
-            usernameInput.addEventListener('change', function() {
-                updatePasswordForUsername(this.value);
-            });
-
-            // Update password for the given username
-            function updatePasswordForUsername(username) {
-                const normalizedUsername = username.toLowerCase();
-                if (userPasswords[normalizedUsername]) {
-                    passwordSelect.value = userPasswords[normalizedUsername];
-                    passwordDisplay.textContent = '••••••••';
-                } else {
-                    passwordSelect.value = '';
-                    passwordDisplay.textContent = 'Select a username first';
-                }
             }
-
-            // Filter function for dropdown
-            function filterDropdown(value) {
-                const searchTerm = value.toLowerCase();
-
-                usernameOptions.forEach(option => {
-                    const username = option.getAttribute('data-username').toLowerCase();
-                    if (username.includes(searchTerm)) {
-                        option.style.display = 'block';
-                    } else {
-                        option.style.display = 'none';
-                    }
-                });
-            }
-
-            // Preserve form values if there was an error
-            {% if error and request.form %}
-                updatePasswordForUsername('{{ request.form.username }}');
-                filterDropdown('{{ request.form.username }}');
-            {% endif %}
         });
+
+        // Filter dropdown options based on input
+        usernameInput.addEventListener('input', function() {
+            filterDropdown(this.value);
+            updatePasswordForUsername(this.value);
+        });
+
+        // Handle selection from dropdown
+        usernameOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                const username = this.getAttribute('data-username');
+                usernameInput.value = username;
+                updatePasswordForUsername(username);
+                usernameDropdown.style.display = 'none';
+            });
+        });
+
+        // Update password when username changes
+        usernameInput.addEventListener('change', function() {
+            updatePasswordForUsername(this.value);
+        });
+
+        // Update password for the given username - FIXED
+        function updatePasswordForUsername(username) {
+            const normalizedUsername = username.toLowerCase();
+            if (userPasswords[normalizedUsername]) {
+                // Set the hidden field (for form submission) - CORRECT ID
+                document.getElementById('password_select').value = userPasswords[normalizedUsername];
+                // Set the visible field (for user feedback) - CORRECT ID
+                document.getElementById('password_display').textContent = '••••••••';
+                console.log("DEBUG: Set password for", username, "to", userPasswords[normalizedUsername]);
+            } else {
+                document.getElementById('password_select').value = '';
+                document.getElementById('password_display').textContent = 'Select a username first';
+                console.log("DEBUG: No password found for", username);
+            }
+        }
+
+        // Filter function for dropdown
+        function filterDropdown(value) {
+            const searchTerm = value.toLowerCase();
+
+            usernameOptions.forEach(option => {
+                const username = option.getAttribute('data-username').toLowerCase();
+                if (username.includes(searchTerm)) {
+                    option.style.display = 'block';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+        }
+
+        // Debug: Log that userPasswords is loaded
+        console.log("userPasswords loaded with", Object.keys(userPasswords).length, "users");
+
+        // Preserve form values if there was an error
+        {% if error and request.form %}
+            updatePasswordForUsername('{{ request.form.username }}');
+            filterDropdown('{{ request.form.username }}');
+        {% endif %}
+    });
+</script>
+
+                // ===== DEBUG SCRIPT - FIXED VERSION =====
+        console.log("Login page loaded");
+
+        // Check if JavaScript is working - moved to global scope
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("DOM fully loaded");
+        });
+
+        // Monitor form submission - simplified
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    console.log("=== FORM SUBMISSION DEBUG ===");
+                    console.log("Form submitted!");
+
+                    const username = document.getElementById('username')?.value;
+                    const passwordSelect = document.getElementById('password_select')?.value;
+
+                    console.log("Username field value:", username);
+                    console.log("Hidden password field value:", passwordSelect);
+                    console.log("Form action:", this.action);
+                    console.log("Form method:", this.method);
+
+                    // Check if password is actually set
+                    if (!passwordSelect) {
+                        console.error("❌ ERROR: Hidden password field is empty!");
+                        console.error("This means the JavaScript didn't set the password properly");
+                    } else {
+                        console.log("✅ Password field is populated");
+                    }
+
+                    // Let the form submit normally so we can see what happens
+                });
+            }
+        });
+        // ===== END DEBUG SCRIPT =====
+
+                // Quick test: Check if form exists and can be submitted
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                const form = document.querySelector('form');
+                const submitButton = form.querySelector('button[type="submit"]');
+
+                console.log("Form element:", form ? "✅ Found" : "❌ Missing");
+                console.log("Submit button:", submitButton ? "✅ Found" : "❌ Missing");
+
+                // Test form submission programmatically
+                if (form && submitButton) {
+                    console.log("Form action:", form.action);
+                    console.log("Form method:", form.method);
+
+                    // Test if we can trigger submission
+                    submitButton.addEventListener('click', function() {
+                        console.log("Submit button clicked!");
+                    });
+                }
+            }, 1000);
+        });
+
     </script>
 </body>
 </html>
