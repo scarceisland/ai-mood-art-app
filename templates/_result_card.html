@@ -1,49 +1,62 @@
-{% if error %}
-  <p class="error">{{ error }}</p>
-{% elif saved %}
-  <h2>Thanks!</h2>
-  <p>Your feedback was saved. You can generate another image above.</p>
-{% else %}
-  <div class="grid">
-    <div>
-      <img class="art" src="{{ image_url }}" alt="Generated art">
+<div class="result-card">
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% else %}
+    <div class="image-wrap">
+      <img src="{{ image_url }}" alt="{{ prompt }}" class="art"
+           onload="this.parentNode.querySelector('.img-spinner').style.display='none';
+                   this.parentNode.querySelector('.img-fallback').style.display='none';"
+           onerror="this.parentNode.querySelector('.img-spinner').style.display='none';
+                    this.parentNode.querySelector('.img-fallback').style.display='block';">
+
+      <!-- Loading spinner -->
+      <div class="img-spinner">
+        <div class="spinner small"></div>
+        <p>Generating image... (this may take 10-20 seconds)</p>
+      </div>
+
+      <!-- Error fallback -->
+      <div class="img-fallback" style="display: none;">
+        <p class="error">Image failed to load. Please try again.</p>
+        <button onclick="window.location.reload()">Retry</button>
+      </div>
     </div>
-    <div>
-      <h2>Advice</h2>
+
+    <div class="advice">
+      <h3>When feeling {{ emotion }}:</h3>
       <p>{{ advice }}</p>
-      <div class="spacer"></div>
-
-      <form
-        hx-post="{{ url_for('main.feedback') }}"
-        hx-target="#result"
-        hx-swap="innerHTML"
-        hx-indicator="#spinner"
-      >
-        <input type="hidden" name="emotion" value="{{ emotion }}">
-        <input type="hidden" name="prompt" value="{{ prompt }}">
-        <input type="hidden" name="image_url" value="{{ image_url }}">
-        <input type="hidden" name="advice" value="{{ advice }}">
-
-        <label>Did the image match your mood?</label>
-        <select name="predicted_correct" required>
-          <option value="">-- select --</option>
-          <option value="1">Yes</option>
-          <option value="0">No</option>
-        </select>
-
-        <label>Was the advice OK?</label>
-        <select name="advice_ok" required>
-          <option value="">-- select --</option>
-          <option value="1">Yes</option>
-          <option value="0">No</option>
-        </select>
-
-        <label>Any comments?</label>
-        <textarea name="comments" placeholder="(optional)"></textarea>
-
-        <div class="spacer"></div>
-        <button type="submit">Submit feedback & finish</button>
-      </form>
     </div>
-  </div>
-{% endif %}
+
+    <!-- FEEDBACK FORM - ADDED BACK -->
+    <form hx-post="{{ url_for('main.feedback') }}" hx-swap="outerHTML">
+      <input type="hidden" name="emotion" value="{{ emotion }}">
+      <input type="hidden" name="prompt" value="{{ prompt }}">
+      <input type="hidden" name="image_url" value="{{ image_url }}">
+      <input type="hidden" name="advice" value="{{ advice }}">
+
+      <div class="row">
+        <div class="col">
+          <label>Did this match your mood?</label>
+          <select name="predicted_correct" required>
+            <option value="">-- select --</option>
+            <option value="1">Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+        <div class="col">
+          <label>Was the advice helpful?</label>
+          <select name="advice_ok" required>
+            <option value="">-- select --</option>
+            <option value="1">Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+      <textarea name="comments" placeholder="Additional feedback (optional)"></textarea>
+      <div class="spacer"></div>
+      <button type="submit">Submit Feedback</button>
+    </form>
+  {% endif %}
+</div>
