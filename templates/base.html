@@ -2,38 +2,76 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Mood → Art (Local Demo)</title>
+  <title>AI Art Mood App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
-  <!-- HTMX CDN -->
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+  <!-- JS libs (available site-wide) -->
+  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-LvHcWwM0+tUBz4EwJzq0k0wDq3k4A8JCSsT6Q9qV+23H8dYVwRUynrZQ3f3Pw4xR" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
   <div class="wrap">
+    <!-- Top navigation -->
     <div class="topbar card">
-      <div class="chip">Mood → Art (Local)</div>
+      <a class="chip" href="{{ url_for('main.entry') }}">AI Art Mood App</a>
+
       <div class="right">
-        {% if session.username %}
-          <span class="chip">Signed in: {{ session.username }}</span>
-          {% if session.username == 'admin' %}
-            <a class="chip" href="{{ url_for('main.admin') }}">Admin</a>
+        {% if session.get('username') %}
+          <span class="chip">Signed in: {{ session.get('username') }}</span>
+
+          {% if session.get('username') == 'admin' %}
+            <!-- QUICK ADMIN LINKS -->
+            <a class="chip" href="{{ url_for('main.admin_dashboard') }}">Dashboard</a>
+            <a class="chip" href="{{ url_for('main.admin') }}">Feedback</a>
+            <a class="chip" href="{{ url_for('main.admin_logs') }}">Logs</a>
           {% endif %}
+
           <a href="{{ url_for('main.logout') }}"><button class="secondary">Logout</button></a>
+        {% else %}
+          <!-- Shortcuts when logged out -->
+          <a class="chip" href="{{ url_for('main.admin_login_page') }}">Admin</a>
+          <a class="chip" href="{{ url_for('main.login_page') }}">Users</a>
         {% endif %}
       </div>
     </div>
 
+    <!-- Page content -->
     <div class="card">
       {% block content %}{% endblock %}
     </div>
 
-    <div class="footer">Images: Pollinations (no key) • Data: SQLite in /data • HTMX for no-reload actions</div>
+    <div class="footer">
+      Images: Pollinations (no key) • Data: SQLite in /data • HTMX for no-reload actions
+    </div>
   </div>
 
-  <!-- Optional: show spinner while HTMX requests run -->
+  <!-- Optional: place to hook global HTMX behavior if needed -->
   <script>
     document.body.addEventListener('htmx:configRequest', (evt) => {
-      // could add headers/token here if needed
+      // e.g., add custom headers/tokens: evt.detail.headers['X-My-Header'] = 'value'
+    });
+  </script>
+
+  <!-- SAFE CRITERION INITIALIZATION - ADDED HERE -->
+  <script>
+    // Safe initialization for window.criterion if it exists
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if the criterion library exists before using it
+        if (typeof window.criterion !== 'undefined' && typeof window.criterion.initialize === 'function') {
+            console.log("Initializing criterion library...");
+            try {
+                window.wes = window.criterion.initialize();
+                console.log("Criterion initialized successfully");
+            } catch (e) {
+                console.error("Failed to initialize criterion:", e);
+            }
+        } else {
+            console.warn("Criterion library not available - skipping initialization");
+            // This is normal if the library isn't loaded on this page
+        }
     });
   </script>
 </body>
