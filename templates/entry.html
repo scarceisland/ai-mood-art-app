@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="entry-container" style="max-width: 550px; margin: 40px auto; color: #e0e0e0;">
+
+    <!-- Participant Information & Consent Box -->
+    <div class="card" style="margin-bottom: 24px; padding: 25px; border: 1px solid #4a4a4a; background-color: #2d2d2d;">
+        <h4 style="margin-top: 0; color: #6b8cff; font-size: 1.2em;">Participant Information & Consent</h4>
+        <p class="muted" style="margin-bottom: 12px;">
+            Welcome! This application is part of a university dissertation project. Your participation is completely anonymous.
+        </p>
+        <ul class="muted" style="padding-left: 20px; margin-bottom: 12px; line-height: 1.6;">
+            <li><strong>Data Collected:</strong> We collect your chosen emotion, text prompts, and your feedback on the AI-generated images and advice.</li>
+            <li><strong>Anonymity:</strong> We use pre-defined usernames and do <strong>not</strong> collect personal data like IP addresses.</li>
+            <li><strong>Important:</strong> For your privacy, please do <strong>not</strong> enter any personal information (such as your real name, location, or email) into the prompt or comment boxes.</li>
+        </ul>
+    </div>
+
+    <!-- Consent and Role Selection -->
+    <div class="card">
+        <h2>Acknowledge and Proceed</h2>
+        <!-- FIX: Removed the onclick attribute from this div to prevent a double-toggle event -->
+        <div class="form-group" style="margin-top: 20px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input type="checkbox" id="consent-checkbox" style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="consent-checkbox" style="cursor: pointer;">I have read the information and I consent to participate.</label>
+        </div>
+
+        <p class="muted" style="margin-top: 20px; padding: 10px; background-color: #3d3d3d; border-radius: 4px;">
+            <b>For participants:</b> Please check the box above and click the 'Users' button to continue.
+        </p>
+        <div class="form-actions" style="margin-top: 20px; display: flex; justify-content: space-between; gap: 10px;">
+             <a href="{{ url_for('main.admin_login_page') }}"><button class="secondary">Admin</button></a>
+             <a id="users-link" href="{{ url_for('main.login_page') }}">
+                <button id="users-button" class="button" disabled>Users</button>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const consentCheckbox = document.getElementById('consent-checkbox');
+    const usersButton = document.getElementById('users-button');
+    const usersLink = document.getElementById('users-link');
+    // Also make the label clickable to toggle the checkbox, which is good practice.
+    const consentLabel = document.querySelector('label[for="consent-checkbox"]');
+
+    // Function to update the button state
+    function updateButtonState() {
+        if (consentCheckbox.checked) {
+            usersButton.disabled = false;
+            usersButton.style.cursor = 'pointer';
+            usersButton.style.opacity = '1';
+            usersLink.style.pointerEvents = 'auto'; // Make the link clickable
+        } else {
+            usersButton.disabled = true;
+            usersButton.style.cursor = 'not-allowed';
+            usersButton.style.opacity = '0.5';
+            usersLink.style.pointerEvents = 'none'; // Make the link unclickable
+        }
+    }
+
+    // Add event listener to the checkbox
+    consentCheckbox.addEventListener('change', updateButtonState);
+
+    // Make the whole area clickable
+    if (consentLabel) {
+        consentLabel.parentElement.addEventListener('click', function(event) {
+            // Prevent the click from firing twice if the user clicks exactly on the checkbox input
+            if (event.target !== consentCheckbox) {
+                 consentCheckbox.checked = !consentCheckbox.checked;
+                 // Manually trigger the change event
+                 consentCheckbox.dispatchEvent(new Event('change'));
+            }
+        });
+    }
+
+    // Set the initial state when the page loads
+    updateButtonState();
+});
+</script>
+{% endblock %}
+

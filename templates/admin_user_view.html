@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="admin-container">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <h2>Admin Panel</h2>
+        <nav class="admin-nav">
+            <a href="{{ url_for('main.admin_dashboard') }}" class="nav-item active">Dashboard</a>
+            <a href="{{ url_for('main.admin') }}" class="nav-item">Feedback</a>
+            <a href="{{ url_for('main.admin_logs') }}" class="nav-item">Logs</a>
+            <a href="{{ url_for('main.admin_settings') }}" class="nav-item">Settings</a>
+            <a href="{{ url_for('main.logout') }}" class="nav-item logout">Logout</a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="admin-main">
+        <div class="admin-header">
+            <h1>User Details: {{ user_data.username }}</h1>
+            <a href="{{ url_for('main.admin_dashboard') }}" class="nav-item">← Back to Dashboard</a>
+        </div>
+
+        <!-- User Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Feedback</h3>
+                <div class="stat-number">{{ user_data.feedback_count }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Log Entries</h3>
+                <div class="stat-number">{{ user_data.log_count }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Last Login</h3>
+                <div class="stat-number" style="font-size: 1.5em;">{{ user_data.last_login.strftime('%d/%m/%Y %H:%M') if user_data.last_login else 'Never' }}</div>
+            </div>
+        </div>
+
+        <!-- User Feedback Table -->
+        <div class="admin-section">
+            <h3>Feedback Submitted by {{ user_data.username }}</h3>
+            <div class="table-container" style="max-height: 300px;">
+                {% if user_data.feedback %}
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Emotion</th>
+                            <th>Prompt</th>
+                            <th>Comments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in user_data.feedback %}
+                        <tr>
+                            <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ item.emotion }}</td>
+                            <td class="truncate-text" title="{{ item.prompt }}">{{ item.prompt|truncate(40) }}</td>
+                            <td class="truncate-text" title="{{ item.comments }}">{{ item.comments|truncate(30) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="muted" style="text-align: center; padding: 20px;">This user has not submitted any feedback.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- User Logs Table -->
+        <div class="admin-section">
+            <h3>Log History for {{ user_data.username }}</h3>
+            <div class="table-container" style="max-height: 300px;">
+                 {% if user_data.logs %}
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Event</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in user_data.logs %}
+                        <tr>
+                            <td>{{ log.timestamp.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                            <td>{{ log.event }}</td>
+                            <td><pre style="white-space:pre-wrap;margin:0;font-size:0.9em;">{{ log.data }}</pre></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                 {% else %}
+                <p class="muted" style="text-align: center; padding: 20px;">No log entries found for this user.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Scoped styles for this page */
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.truncate-text {
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+pre {
+    font-family: inherit;
+    color: #ccc;
+}
+</style>
+
+{% endblock %}

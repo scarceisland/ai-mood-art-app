@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:720px;margin:24px auto">
+  <h1>Admin Password Reset</h1>
+  <p class="muted">
+    To reset the password, you must provide the secret reset code defined
+    in your project's <code>.env</code> file.
+  </p>
+
+  <div class="spacer"></div>
+
+  <form method="post" action="{{ url_for('main.admin_reset') }}" autocomplete="off">
+    {% if msg %}<p class="success">{{ msg }}</p>{% endif %}
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+    <label>Reset code</label>
+    <input type="password" name="code" placeholder="Enter reset code from .env file" required>
+
+    <label>New password</label>
+    <input type="password" name="pw1" placeholder="New password" required>
+
+    <label>Confirm new password</label>
+    <input type="password" name="pw2" placeholder="Confirm password" required>
+
+    <div class="spacer"></div>
+    <div class="row" style="gap:8px">
+        <button type="submit">Set New Password</button>
+        <a href="{{ url_for('main.admin_login_page') }}"><button class="secondary" type="button">← Back to Login</button></a>
+    </div>
+  </form>
+</div>
+{% endblock %}

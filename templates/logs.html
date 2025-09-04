@@ -1,57 +1,252 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Admin: Session Logs</h1>
-<p class="muted">
-  Viewing {{ source|upper }} log • {{ total }} entries • Page {{ page }} of {{ pages }}
-</p>
 
-<form method="get" action="{{ url_for('main.admin_logs') }}" class="row" style="align-items:flex-end">
-  <div class="col">
-    <label>Source</label>
-    <select name="source">
-      <option value="auto" {% if source=='auto' %}selected{% endif %}>auto (prefers JSONL, falls back to CSV)</option>
-      <option value="jsonl" {% if source=='jsonl' %}selected{% endif %}>jsonl</option>
-      <option value="csv" {% if source=='csv' %}selected{% endif %}>csv</option>
-    </select>
-  </div>
-  <div class="col">
-    <label>Filter by event (optional)</label>
-    <input type="text" name="event" value="{{ event or '' }}" placeholder="e.g., login_success">
-  </div>
-  <div class="col">
-    <button type="submit">Apply</button>
-    <a href="{{ url_for('main.admin_logs_download', source=source if source!='auto' else 'jsonl') }}"><button class="secondary" type="button">Download raw</button></a>
-  </div>
-</form>
+<div class="admin-container">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <h2>Admin Panel</h2>
+        <nav class="admin-nav">
+            <a href="{{ url_for('main.admin_dashboard') }}" class="nav-item">Dashboard</a>
+            <a href="{{ url_for('main.admin') }}" class="nav-item">Feedback</a>
+            <a href="{{ url_for('main.admin_logs') }}" class="nav-item active">Logs</a>
+            <a href="{{ url_for('main.admin_settings') }}" class="nav-item">Settings</a>
+            <a href="{{ url_for('main.logout') }}" class="nav-item logout">Logout</a>
+        </nav>
+    </div>
 
-<div class="spacer"></div>
+    <!-- Main Content -->
+    <div class="admin-main">
+        <h1>Admin: Session Logs</h1>
 
-<table>
-  <tr>
-    <th>Timestamp</th>
-    <th>Event</th>
-    <th>User</th>
-    <th>Data</th>
-  </tr>
-  {% for row in rows %}
-  <tr>
-    <td>{{ row.ts }}</td>
-    <td>{{ row.event }}</td>
-    <td>{{ row.user }}</td>
-    <td><pre style="white-space:pre-wrap;margin:0">{{ row.data }}</pre></td>
-  </tr>
-  {% endfor %}
-</table>
+        {% set F = applied_filters %}
+        <p class="muted">
+          Showing up to {{ F.rows }} rows • Filters:
+          Event=<code>{{ F.event or 'ANY' }}</code>,
+          User=<code>{{ F.user or 'ANY' }}</code>,
+          Source=<code>{{ F.source or 'ANY' }}</code>,
+          Date=<code>{{ (F.start or 'start') ~ ' → ' ~ (F.end or 'end') }}</code>
+        </p>
 
-<div class="row" style="justify-content:space-between; margin-top:12px">
-  {% if page > 1 %}
-    <a href="{{ url_for('main.admin_logs', page=page-1, source=source, event=event) }}"><button class="secondary">← Previous</button></a>
-  {% else %}
-    <span></span>
-  {% endif %}
+        <table>
+          <tr>
+            <th>Timestamp</th>
+            <th>Event</th>
+            <th>User</th>
+            <th>Source</th>
+            <th>Data</th>
+          </tr>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.get('created_at') or row.get('timestamp') or row.get('time') or row.get('date') or '' }}</td>
+            <td>{{ row.get('event','') }}</td>
+            <td>{{ row.get('user','') }}</td>
+            <td>{{ row.get('source','') }}</td>
+            <td><pre style="white-space:pre-wrap;margin:0">{{ row.get('data','') }}</pre></td>
+          </tr>
+          {% endfor %}
+        </table>
 
-  {% if page < pages %}
-    <a href="{{ url_for('main.admin_logs', page=page+1, source=source, event=event) }}"><button>Next →</button></a>
-  {% endif %}
+        {% if rows %}
+        {# Only show the charts and insights if there is data #}
+        <hr style="margin:16px 0">
+
+        <h2>Visual Insights</h2>
+        <p class="muted">These charts are built from the rows on this page.</p>
+
+        <div class="grid" style="align-items:stretch">
+          <div>
+            <h3>Event breakdown</h3>
+            <canvas id="chartEvents"></canvas>
+            <div class="right" style="margin-top:8px">
+              <button id="dlEvents">Download PNG</button>
+            </div>
+          </div>
+          <div>
+            <h3>Events per day</h3>
+            <canvas id="chartDates"></canvas>
+            <div class="right" style="margin-top:8px">
+              <button id="dlDates">Download PNG</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <div class="card" style="margin-top:8px">
+          <h3>Top users</h3>
+          <canvas id="chartUsers"></canvas>
+          <div class="right" style="margin-top:8px; display:flex; gap:8px; justify-content:flex-end;">
+            <button id="dlUsers">Download PNG</button>
+            <button id="dlAllZip">Download ALL (ZIP)</button>
+          </div>
+        </div>
+
+        {% else %}
+        {# Show a helpful message if there is no data #}
+        <div class="card" style="text-align:center; padding: 32px;">
+          <h3>No Log Data Found</h3>
+          <p class="muted">
+            As you and your users interact with the app (log in, generate images, submit feedback),
+            data will appear here along with visual charts.
+          </p>
+        </div>
+        {% endif %}
+
+        <!-- Exit Button ADDED HERE -->
+        <div class="exit-section" style="text-align: center; margin-top: 30px;">
+            <a href="{{ url_for('main.entry') }}" class="nav-item">← Exit to Landing Page</a>
+        </div>
+    </div>
 </div>
+
+<script>
+  // Fallbacks: load Chart.js and JSZip if not already present
+  (function ensureDeps(){
+    if (!window.Chart) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+      document.head.appendChild(s);
+    }
+    if (!window.JSZip) {
+      const z = document.createElement('script');
+      z.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+      document.head.appendChild(z);
+    }
+  })();
+
+  // Data from Flask (no server changes needed)
+  const ROWS    = {{ rows|tojson }};
+  const FILTERS = {{ applied_filters|tojson }};
+
+  // Derive counts client-side
+  function toDateOnly(row) {
+    const raw = row.created_at || row.timestamp || row.time || row.date || '';
+    // Try to normalize to YYYY-MM-DD
+    const m = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
+    const d = String(raw).match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/);
+    if (m) return m[1];
+    if (d) return `${d[3]}-${d[2]}-${d[1]}`;
+    return '';
+  }
+
+  const eventCounts = new Map();
+  const userCounts  = new Map();
+  const dateCounts  = new Map();
+
+  for (const r of ROWS) {
+    const ev = String(r.event || '').trim();
+    const us = String(r.user  || '').trim();
+    const dt = toDateOnly(r);
+
+    if (ev) eventCounts.set(ev, (eventCounts.get(ev)||0)+1);
+    if (us) userCounts.set(us, (userCounts.get(us)||0)+1);
+    if (dt) dateCounts.set(dt, (dateCounts.get(dt)||0)+1);
+  }
+
+  function mapToSortedArrays(map, sortByKey=false) {
+    const entries = Array.from(map.entries());
+    entries.sort((a,b) => sortByKey ? a[0].localeCompare(b[0]) : b[1]-a[1]);
+    return { labels: entries.map(e=>e[0]), values: entries.map(e=>e[1]) };
+  }
+
+  // Build chart data
+  const CHART_DATA = {
+    events: mapToSortedArrays(eventCounts, true),
+    dates:  (() => {
+      const sorted = Array.from(dateCounts.entries()).sort((a,b)=>a[0].localeCompare(b[0]));
+      return { labels: sorted.map(e=>e[0]), values: sorted.map(e=>e[1]) };
+    })(),
+    users:  mapToSortedArrays(userCounts, false)
+  };
+
+  // Chart helpers
+  function makePie(ctx, labels, data) {
+    return new Chart(ctx, {
+      type: 'pie',
+      data: { labels, datasets: [{ data }] },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+  function makeBar(ctx, labels, data, title) {
+    return new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: title, data }] },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        plugins: { legend: { display: !!title } }
+      }
+    });
+  }
+
+  function downloadChart(chart, base) {
+    if (!chart) return;
+    const url = chart.toBase64Image('image/png', 1);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${base}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  // Build charts after Chart.js is ready
+  function initCharts() {
+    if (!window.Chart || ROWS.length === 0) {
+        setTimeout(initCharts, 100);
+        return;
+    }
+
+    const ctxEvents = document.getElementById('chartEvents');
+    const ctxDates  = document.getElementById('chartDates');
+    const ctxUsers  = document.getElementById('chartUsers');
+
+    let chartEvents = null, chartDates = null, chartUsers = null;
+
+    if (ctxEvents && CHART_DATA.events.labels.length)
+      chartEvents = makePie(ctxEvents, CHART_DATA.events.labels, CHART_DATA.events.values);
+
+    if (ctxDates && CHART_DATA.dates.labels.length)
+      chartDates = makeBar(ctxDates, CHART_DATA.dates.labels, CHART_DATA.dates.values, 'Events/day');
+
+    if (ctxUsers && CHART_DATA.users.labels.length)
+      chartUsers = makeBar(ctxUsers, CHART_DATA.users.labels, CHART_DATA.users.values, 'Events by user');
+
+    // Wire up per-chart PNG
+    document.getElementById('dlEvents').addEventListener('click', () => downloadChart(chartEvents, 'event_breakdown'));
+    document.getElementById('dlDates').addEventListener('click', () => downloadChart(chartDates,  'events_per_day'));
+    document.getElementById('dlUsers').addEventListener('click', () => downloadChart(chartUsers,  'top_users'));
+
+    // ZIP all
+    document.getElementById('dlAllZip').addEventListener('click', async () => {
+        if (!window.JSZip) { alert('JSZip not loaded'); return; }
+
+        const items = [];
+        if (chartEvents) items.push({ chart: chartEvents, name: 'event_breakdown' });
+        if (chartDates)  items.push({ chart: chartDates,  name: 'events_per_day' });
+        if (chartUsers)  items.push({ chart: chartUsers,  name: 'top_users' });
+
+        if (!items.length) { alert('No charts to download.'); return; }
+
+        const zip = new JSZip();
+        for (const {chart, name} of items) {
+          const dataURL = chart.toBase64Image('image/png', 1);
+          const base64 = dataURL.split(',')[1];
+          zip.file(`${name}.png`, base64, { base64: true });
+        }
+
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'charts.zip';
+        document.body.appendChild(a);
+a.click();
+        a.remove();
+    });
+  }
+
+  initCharts();
+</script>
+
 {% endblock %}
+

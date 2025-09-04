@@ -30,7 +30,7 @@
             <a href="{{ url_for('main.admin_dashboard') }}" class="nav-item">Dashboard</a>
             <a href="{{ url_for('main.admin') }}" class="nav-item active">Feedback</a>
             <a href="{{ url_for('main.admin_logs') }}" class="nav-item">Logs</a>
-            <a href="#settings" class="nav-item">Settings</a>
+            <a href="{{ url_for('main.admin_settings') }}" class="nav-item">Settings</a>
             <a href="{{ url_for('main.logout') }}" class="nav-item logout">Logout</a>
         </nav>
     </div>
@@ -178,7 +178,8 @@
 
         <!-- Exit Button -->
         <div class="exit-section">
-            <a href="{{ url_for('main.entry') }}" class="exit-btn">← Exit to Landing Page</a>
+            {# --- THIS LINE HAS BEEN CHANGED --- #}
+            <a href="{{ url_for('main.entry') }}" class="nav-item">← Exit to Landing Page</a>
         </div>
     </div>
 </div>
@@ -320,6 +321,45 @@
 .table-container { overflow-x: auto; max-height: 400px; }
 .admin-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
 .admin-table th { position: sticky; top: 0; background: #3d3d3d; z-index: 10; }
+
+/* Admin Panel Navigation Styles */
+.admin-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.nav-item {
+    padding: 12px 15px;
+    color: #ffffff; /* White color for inactive links */
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background 0.3s, color 0.3s;
+}
+
+.nav-item:hover {
+    background: #3d3d3d;
+    color: #ffffff;
+}
+
+.nav-item.active {
+    background: #7cd67c; /* Lighter green for active links */
+    color: #1a1a1a; /* Dark text for better contrast on green */
+}
+
+.nav-item.logout {
+    color: #ff5252;
+    margin-top: 20px;
+}
+
+.nav-item.logout:hover {
+    background: rgba(255, 82, 82, 0.1);
+}
+
+.exit-section {
+    text-align: center;
+    margin-top: 30px;
+}
 </style>
 
 <!-- FIX: Add Chart.js library -->
@@ -575,5 +615,8 @@ function filterByDate(dateString, filterType) {
     }
 }
 </script>
+
+
+
 
 {% endblock %}

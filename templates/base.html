@@ -8,9 +8,10 @@
   <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
 
   <!-- JS libs (available site-wide) -->
-  <script src="https://unpkg.com/htmx.org@1.9.12" integrity="sha384-LvHcWwM0+tUBz4EwJzq0k0wDq3k4A8JCSsT6Q9qV+23H8dYVwRUynrZQ3f3Pw4xR" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -27,6 +28,7 @@
             <a class="chip" href="{{ url_for('main.admin_dashboard') }}">Dashboard</a>
             <a class="chip" href="{{ url_for('main.admin') }}">Feedback</a>
             <a class="chip" href="{{ url_for('main.admin_logs') }}">Logs</a>
+            <a class="chip" href="{{ url_for('main.admin_settings') }}">Settings</a>
           {% endif %}
 
           <a href="{{ url_for('main.logout') }}"><button class="secondary">Logout</button></a>
@@ -43,8 +45,9 @@
       {% block content %}{% endblock %}
     </div>
 
+    <!-- FOOTER TEXT UPDATED HERE -->
     <div class="footer">
-      Images: Pollinations (no key) • Data: SQLite in /data • HTMX for no-reload actions
+      Images: ClipDrop API • Data: SQLite in /data • HTMX for no-reload actions
     </div>
   </div>
 
@@ -55,11 +58,9 @@
     });
   </script>
 
-  <!-- SAFE CRITERION INITIALIZATION - ADDED HERE -->
+  <!-- SAFE CRITERION INITIALIZATION -->
   <script>
-    // Safe initialization for window.criterion if it exists
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if the criterion library exists before using it
         if (typeof window.criterion !== 'undefined' && typeof window.criterion.initialize === 'function') {
             console.log("Initializing criterion library...");
             try {
@@ -70,9 +71,9 @@
             }
         } else {
             console.warn("Criterion library not available - skipping initialization");
-            // This is normal if the library isn't loaded on this page
         }
     });
   </script>
 </body>
 </html>
+

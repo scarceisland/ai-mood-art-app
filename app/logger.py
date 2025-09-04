@@ -1,38 +1,45 @@
-import os, json, csv, datetime
-from typing import Dict, Any
+import json
+import datetime as dt
 from flask import current_app
+from .utils import get_db
 
-def _now():
-    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def _ensure_parent(path: str):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+def _now_str() -> str:
+    """Returns the current time as an ISO 8601 formatted string."""
+    return dt.datetime.now().isoformat()
 
-def log_event(event: str, user: str = None, data: Dict[str, Any] = None):
+
+def log_event(event: str, user: str | None = None, data: dict | None = None, source: str | None = None) -> None:
     """
-    Writes a single-line JSON (and/or CSV) entry depending on LOG_FORMAT.
-    event: e.g., "login_success", "login_fail", "generate", "feedback_submit", "export_csv"
+    Writes a single event to the `logs` database table.
     """
-    fmt = current_app.config.get("LOG_FORMAT", "both")
-    payload = {
-        "ts": _now(),
-        "event": event,
-        "user": user or "",
-        "data": data or {},
+    app = current_app._get_current_object()
+
+    record = {
+        "timestamp": _now_str(),
+        "event": str(event),
+        "user": "" if user is None else str(user),
+        "source": "" if source is None else str(source),
+        # Convert the data dictionary to a JSON string for database storage.
+        "data": json.dumps(data) if data is not None else None,
     }
 
-    if fmt in ("jsonl", "both"):
-        path = current_app.config["LOG_JSONL_PATH"]
-        _ensure_parent(path)
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-
-    if fmt in ("csv", "both"):
-        path = current_app.config["LOG_CSV_PATH"]
-        _ensure_parent(path)
-        file_exists = os.path.exists(path)
-        with open(path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            if not file_exists:
-                writer.writerow(["ts", "event", "user", "data_json"])
-            writer.writerow([payload["ts"], payload["event"], payload["user"], json.dumps(payload["data"], ensure_ascii=False)])
+    try:
+        db = get_db()
+        db.execute(
+            """
+            INSERT INTO logs (timestamp, event, user, source, data)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                record["timestamp"],
+                record["event"],
+                record["user"],
+                record["source"],
+                record["data"],
+            )
+        )
+        db.commit()
+    except Exception as e:
+        # If the database write fails, log the error to the console for debugging.
+        app.logger.error(f"Failed to write to logs database: {e}")

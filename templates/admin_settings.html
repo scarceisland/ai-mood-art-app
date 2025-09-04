@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+        <h2>Admin Panel</h2>
+        <nav class="admin-nav">
+            <a href="{{ url_for('main.admin_dashboard') }}" class="nav-item">Dashboard</a>
+            <a href="{{ url_for('main.admin') }}" class="nav-item">Feedback</a>
+            <a href="{{ url_for('main.admin_logs') }}" class="nav-item">Logs</a>
+            <a href="{{ url_for('main.admin_settings') }}" class="nav-item active">Settings</a>
+            <a href="{{ url_for('main.logout') }}" class="nav-item logout">Logout</a>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="admin-main">
+        <h1>Admin Settings</h1>
+        <p class="muted">Manage application configuration and API keys.</p>
+
+        {% if success_message %}
+            <div class="card success" style="margin-bottom: 16px; background-color: #2a5237;">
+                {{ success_message }}
+            </div>
+        {% endif %}
+
+        <div class="card">
+            <form method="post">
+                <h3>API Settings</h3>
+                <div class="form-group">
+                    <label for="api_key">ClipDrop API Key</label>
+                    <!-- NEW: Input field is now wrapped for icon positioning -->
+                    <div class="input-with-icon">
+                        <input type="password" id="api_key" name="api_key"
+                               value="{{ clipdrop_api_key or '' }}"
+                               placeholder="Enter your ClipDrop API key">
+                        <!-- NEW: The interactive eye icon to toggle visibility -->
+                        <span id="toggle-visibility-btn" class="toggle-visibility-icon">
+                            <!-- SVG will be inserted here by JavaScript -->
+                        </span>
+                    </div>
+                    <p class="muted" style="font-size: 0.9em; margin-top: 4px;">
+                        This key is used to generate images. Get your key from the ClipDrop website.
+                    </p>
+                </div>
+                <div class="form-actions" style="text-align: right; margin-top: 16px;">
+                    <button type="submit" class="button">Save Settings</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Exit Button -->
+        <div class="exit-section">
+            <a href="{{ url_for('main.entry') }}" class="nav-item">← Exit to Landing Page</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Add specific styles for the new input with icon */
+    .input-with-icon {
+        position: relative;
+        display: flex;
+        align-items: center;
+        margin-top: 8px;
+    }
+
+    /* Make sure the input field doesn't overlap with the icon */
+    .input-with-icon input {
+        width: 100%;
+        padding-right: 45px; /* Add space for the icon */
+    }
+
+    .toggle-visibility-icon {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #a0a0a0; /* Muted color for the icon */
+        display: flex;
+        align-items: center;
+    }
+
+    .toggle-visibility-icon:hover {
+        color: #ffffff; /* Brighter on hover */
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const apiKeyInput = document.getElementById('api_key');
+    const toggleButton = document.getElementById('toggle-visibility-btn');
+
+    // SVG icons for eye and eye-slash
+    const eyeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+    const eyeSlashIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path><line x1="2" x2="22" y1="2" y2="22"></line></svg>`;
+
+    // Set the initial icon
+    toggleButton.innerHTML = eyeIcon;
+
+    // Add click event listener to toggle visibility
+    toggleButton.addEventListener('click', function() {
+        if (apiKeyInput.type === 'password') {
+            apiKeyInput.type = 'text';
+            toggleButton.innerHTML = eyeSlashIcon;
+        } else {
+            apiKeyInput.type = 'password';
+            toggleButton.innerHTML = eyeIcon;
+        }
+    });
+});
+</script>
+
+{% endblock %}
+

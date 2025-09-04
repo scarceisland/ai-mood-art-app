@@ -65,5 +65,7 @@ ADVICE_BANK = {
     ]
 }
 
+
 def advice_for(emotion: str) -> str:
-    return random.choice(ADVICE_BANK[emotion])
+    """Returns a random piece of advice for a given emotion."""
+    return random.choice(ADVICE_BANK.get(emotion, []))

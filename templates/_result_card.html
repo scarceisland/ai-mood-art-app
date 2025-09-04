@@ -29,7 +29,7 @@
   <form hx-post="{{ url_for('main.feedback') }}" hx-swap="outerHTML">
     <input type="hidden" name="emotion" value="{{ emotion }}">
     <input type="hidden" name="prompt" value="{{ prompt }}">
-    <input type="hidden" name="image_url" value="{{ image_url }}">
+    <input type="hidden" name="image_url" value="{% if image_url.startswith('data:image') %}generated_via_clipdrop{% else %}{{ image_url }}{% endif %}">
     <input type="hidden" name="advice" value="{{ advice }}">
 
     <div class="row">

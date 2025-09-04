@@ -160,6 +160,32 @@
       alert("Sorry, the image generation failed. Please try again.");
     }
   });
+
+  // Handle image loading errors in the result card
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'result') {
+      // Add event listeners for any images in the result
+      const images = document.querySelectorAll('#result img');
+      images.forEach(img => {
+        img.onerror = function() {
+          this.style.display = 'none';
+          const fallback = this.parentNode.querySelector('.img-fallback');
+          if (fallback) {
+            fallback.style.display = 'block';
+          }
+        };
+
+        // Add loading state for images
+        img.onload = function() {
+          const spinner = this.parentNode.querySelector('.img-spinner');
+          if (spinner) {
+            spinner.style.display = 'none';
+          }
+          this.style.display = 'block';
+        };
+      });
+    }
+  });
 </script>
 
 {% endblock %}
