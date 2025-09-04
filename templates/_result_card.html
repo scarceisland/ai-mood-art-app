@@ -1,62 +1,120 @@
 <div class="result-card">
-  {% if error %}
-    <div class="error">{{ error }}</div>
-  {% else %}
-    <div class="image-wrap">
-      <img src="{{ image_url }}" alt="{{ prompt }}" class="art"
-           onload="this.parentNode.querySelector('.img-spinner').style.display='none';
-                   this.parentNode.querySelector('.img-fallback').style.display='none';"
-           onerror="this.parentNode.querySelector('.img-spinner').style.display='none';
-                    this.parentNode.querySelector('.img-fallback').style.display='block';">
-
-      <!-- Loading spinner -->
-      <div class="img-spinner">
-        <div class="spinner small"></div>
-        <p>Generating image... (this may take 10-20 seconds)</p>
+  <div class="row">
+    <div class="col">
+      <div class="image-wrap">
+        <div class="img-spinner">
+          <div class="spinner small"></div>
+          <p>Generating image... (this may take 10-20 seconds)</p>
+        </div>
+        <div class="img-fallback" style="display: none;">
+          <p>Image failed to load. Please try again.</p>
+          <button onclick="retryImageLoad(this)">Retry</button>
+        </div>
+        <img src="{{ image_url }}" class="art" style="display: none;"
+             onload="handleImageLoad(this)"
+             onerror="handleImageError(this)"
+             alt="Generated image for {{ emotion }} mood">
       </div>
+    </div>
+    <div class="col">
+      <div class="advice">
+        <h3>When feeling {{ emotion }}:</h3>
+        <p>{{ advice }}</p>
+      </div>
+    </div>
+  </div>
 
-      <!-- Error fallback -->
-      <div class="img-fallback" style="display: none;">
-        <p class="error">Image failed to load. Please try again.</p>
-        <button onclick="window.location.reload()">Retry</button>
+  <hr>
+
+  <form hx-post="{{ url_for('main.feedback') }}" hx-swap="outerHTML">
+    <input type="hidden" name="emotion" value="{{ emotion }}">
+    <input type="hidden" name="prompt" value="{{ prompt }}">
+    <input type="hidden" name="image_url" value="{{ image_url }}">
+    <input type="hidden" name="advice" value="{{ advice }}">
+
+    <div class="row">
+      <div class="col">
+        <label>Did this match your mood?</label>
+        <select name="predicted_correct" required>
+          <option value="">-- select --</option>
+          <option value="1">Yes</option>
+          <option value="0">No</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Was the advice helpful?</label>
+        <select name="advice_ok" required>
+          <option value="">-- select --</option>
+          <option value="1">Yes</option>
+          <option value="0">No</option>
+        </select>
       </div>
     </div>
 
-    <div class="advice">
-      <h3>When feeling {{ emotion }}:</h3>
-      <p>{{ advice }}</p>
-    </div>
+    <div class="spacer"></div>
 
-    <!-- FEEDBACK FORM - ADDED BACK -->
-    <form hx-post="{{ url_for('main.feedback') }}" hx-swap="outerHTML">
-      <input type="hidden" name="emotion" value="{{ emotion }}">
-      <input type="hidden" name="prompt" value="{{ prompt }}">
-      <input type="hidden" name="image_url" value="{{ image_url }}">
-      <input type="hidden" name="advice" value="{{ advice }}">
+    <label>Additional feedback (optional)</label>
+    <textarea name="comments" placeholder="Any other comments..."></textarea>
 
-      <div class="row">
-        <div class="col">
-          <label>Did this match your mood?</label>
-          <select name="predicted_correct" required>
-            <option value="">-- select --</option>
-            <option value="1">Yes</option>
-            <option value="0">No</option>
-          </select>
-        </div>
-        <div class="col">
-          <label>Was the advice helpful?</label>
-          <select name="advice_ok" required>
-            <option value="">-- select --</option>
-            <option value="1">Yes</option>
-            <option value="0">No</option>
-          </select>
-        </div>
-      </div>
+    <div class="spacer"></div>
 
-      <div class="spacer"></div>
-      <textarea name="comments" placeholder="Additional feedback (optional)"></textarea>
-      <div class="spacer"></div>
-      <button type="submit">Submit Feedback</button>
-    </form>
-  {% endif %}
+    <button type="submit">Submit Feedback</button>
+  </form>
 </div>
+
+<script>
+function handleImageLoad(img) {
+  const spinner = img.previousElementSibling.previousElementSibling;
+  const fallback = img.previousElementSibling;
+
+  spinner.style.display = 'none';
+  fallback.style.display = 'none';
+  img.style.display = 'block';
+
+  // Clear any existing timeouts
+  if (img.loadTimeout) {
+    clearTimeout(img.loadTimeout);
+  }
+}
+
+function handleImageError(img) {
+  const spinner = img.previousElementSibling.previousElementSibling;
+  const fallback = img.previousElementSibling;
+
+  spinner.style.display = 'none';
+  fallback.style.display = 'block';
+  img.style.display = 'none';
+
+  // Clear any existing timeouts
+  if (img.loadTimeout) {
+    clearTimeout(img.loadTimeout);
+  }
+}
+
+function retryImageLoad(button) {
+  const fallback = button.parentElement;
+  const img = fallback.previousElementSibling;
+  const spinner = fallback.previousElementSibling.previousElementSibling;
+
+  fallback.style.display = 'none';
+  spinner.style.display = 'block';
+  img.style.display = 'none';
+
+  // Force image reload by adding a timestamp parameter
+  const src = img.src;
+  const separator = src.includes('?') ? '&' : '?';
+  img.src = src.split('?')[0] + separator + 'retry=' + new Date().getTime();
+}
+
+// Set a timeout for each image to handle cases where it never loads
+document.addEventListener('DOMContentLoaded', function() {
+  const images = document.querySelectorAll('.image-wrap img');
+  images.forEach(img => {
+    img.loadTimeout = setTimeout(function() {
+      if (img.style.display === 'none') {
+        handleImageError(img);
+      }
+    }, 25000); // 25 second timeout
+  });
+});
+</script>
