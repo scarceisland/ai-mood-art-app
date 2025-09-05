@@ -73,12 +73,15 @@ _cd <your-project-folder>_
 It is highly recommended to use a virtual environment.
 
 _# Create the virtual environment_
+
 _python -m venv venv_
 
 _# Activate it (Windows PowerShell)_
+
 _.\venv\Scripts\Activate.ps1_
 
 _# Activate it (macOS/Linux)_
+
 _source venv/bin/activate_
 
 # 3. Install Dependencies
@@ -92,6 +95,7 @@ _pip install -r requirements.txt_
 The application requires the ClipDrop API key to be set as an environment variable.
 
 _# In Windows PowerShell_
+
 _$env:CLIPDROP_API_KEY="your_clipdrop_api_key_here"_
 
 # 5. Initialize the Database
@@ -115,11 +119,14 @@ The application will be available at _http://127.0.0.1:5000 _.
 This application is configured for deployment on a service like Render. The key files for deployment are:
 
 - _requirements.txt:_ 
+
 Defines the Python dependencies.
 
 - _run.py:_
+
 The entry point for the application.
 
 The recommended start command for a production environment is: 
+
 _gunicorn run:app_
 
