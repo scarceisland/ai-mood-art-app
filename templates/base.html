@@ -11,7 +11,6 @@
   <script src="https://unpkg.com/htmx.org@1.9.12" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -34,8 +33,9 @@
           <a href="{{ url_for('main.logout') }}"><button class="secondary">Logout</button></a>
         {% else %}
           <!-- Shortcuts when logged out -->
-          <a class="chip" href="{{ url_for('main.admin_login') }}">Admin</a>
-          <a class="chip" href="{{ url_for('main.login_page') }}">Users</a>
+          <a class="chip" href="{{ url_for('main.admin_login_page') }}">Admin</a>
+          {# --- THIS LINE HAS BEEN CORRECTED --- #}
+          <a class="chip" href="{{ url_for('main.login') }}">Users</a>
         {% endif %}
       </div>
     </div>
@@ -45,35 +45,10 @@
       {% block content %}{% endblock %}
     </div>
 
-    <!-- FOOTER TEXT UPDATED HERE -->
     <div class="footer">
       Images: ClipDrop API • Data: SQLite in /data • HTMX for no-reload actions
     </div>
   </div>
-
-  <!-- Optional: place to hook global HTMX behavior if needed -->
-  <script>
-    document.body.addEventListener('htmx:configRequest', (evt) => {
-      // e.g., add custom headers/tokens: evt.detail.headers['X-My-Header'] = 'value'
-    });
-  </script>
-
-  <!-- SAFE CRITERION INITIALIZATION -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        if (typeof window.criterion !== 'undefined' && typeof window.criterion.initialize === 'function') {
-            console.log("Initializing criterion library...");
-            try {
-                window.wes = window.criterion.initialize();
-                console.log("Criterion initialized successfully");
-            } catch (e) {
-                console.error("Failed to initialize criterion:", e);
-            }
-        } else {
-            console.warn("Criterion library not available - skipping initialization");
-        }
-    });
-  </script>
 </body>
 </html>
 
