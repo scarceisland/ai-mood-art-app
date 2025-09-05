@@ -38,9 +38,11 @@ Chart.js
 Gunicorn
 #Local Setup and Installation
 To run this project on your local machine, please follow these steps.
-#**1. Clone the Repository**
-Clone this repository to your local machine.
-git clone <your-repository-url>
+#1. Clone the Repository
+
+- Clone this repository to your local machine.
+
+- git clone <your-repository-url>
 cd <your-project-folder>
 
 #**2. Create and Activate Virtual Environment**
