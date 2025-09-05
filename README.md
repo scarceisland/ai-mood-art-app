@@ -2,10 +2,14 @@
 This web application is a full-stack project developed for a university dissertation. It allows users to generate AI-powered art based on their current mood, view tailored advice, and provide feedback on the results. The application includes a comprehensive admin panel for monitoring activity, viewing feedback, and managing application settings.
 # Features
 # User Features
-- **Mood-Based Art Generation:** Select an emotion and provide an optional text prompt to generate a unique piece of AI art.
-- **Contextual Advice:** Receive helpful advice tailored to the selected emotion.
-- **Anonymous Feedback:** Users can provide feedback on whether the generated image matched their mood and if the advice was helpful.
-- **Ethical Consent:** A clear consent form is presented to all participants before they can use the application, ensuring compliance with research ethics.
+- **Mood-Based Art Generation:** 
+Select an emotion and provide an optional text prompt to generate a unique piece of AI art.
+- **Contextual Advice:** 
+Receive helpful advice tailored to the selected emotion.
+- **Anonymous Feedback:** 
+Users can provide feedback on whether the generated image matched their mood and if the advice was helpful.
+- **Ethical Consent:** 
+A clear consent form is presented to all participants before they can use the application, ensuring compliance with research ethics.
 # Admin Features
 - **Interactive Dashboard:** An at-a-glance view of key metrics like total users, images generated, feedback submissions, and active sessions.
 - **User Management:** View a list of all users and drill down into a detailed view of a specific user's activity, including all their feedback and log entries.
