@@ -112,7 +112,7 @@ You can now start the Flask development server.
 
 _python run.py_
 
-The application will be available at _http://127.0.0.1:5000 _.
+The application will be available at _http://127.0.0.1:5000_.
 
 # Deployment
 
