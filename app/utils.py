@@ -1,24 +1,21 @@
 import os
 import sqlite3
+import psycopg2
+from psycopg2.extras import DictCursor
 from functools import wraps
 from flask import session, redirect, url_for, flash, current_app
 
 
 def get_db():
-    """Establishes a connection to the SQLite database."""
-    db_path = current_app.config.get("DATABASE_PATH")
+    """Establishes a connection to the PostgreSQL database on Supabase."""
+    # The connection string is read from an environment variable for security.
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL is not set.")
 
-    if not db_path:
-        # Fallback to a default path in the instance folder if not configured.
-        instance_path = current_app.instance_path
-        db_path = os.path.join(instance_path, "mood_app.db")
-
-    # Ensure the directory for the database file exists.
-    dirpath = os.path.dirname(db_path) or "."
-    os.makedirs(dirpath, exist_ok=True)
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(db_url)
+    # Use DictCursor to get dictionary-like rows, similar to sqlite3.Row
+    conn.cursor_factory = DictCursor
     return conn
 
 
@@ -44,3 +41,4 @@ def admin_required(view):
         return view(*args, **kwargs)
 
     return wrapped
+
