@@ -1,24 +1,28 @@
 import os
+import sqlite3
 import psycopg2
 from psycopg2.extras import DictCursor
 from functools import wraps
 from flask import session, redirect, url_for, flash, current_app
 
-
 def get_db():
-    """Establishes a connection to the PostgreSQL database on Supabase."""
-    # The connection string is read from an environment variable for security.
+    # Try to get Supabase database URL from environment variables
     db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
-    if not db_url:
-        raise RuntimeError("DATABASE URL is not set. Set SUPABASE_DB_URL or DATABASE_URL environment variable.")
 
-    try:
-        conn = psycopg2.connect(db_url)
-        return conn
-    except Exception as e:
-        print(f"Database connection failed: {e}")
-        # Fallback to SQLite or handle error
-        raise
+    if db_url:
+        try:
+            # Try to connect to Supabase PostgreSQL
+            conn = psycopg2.connect(db_url)
+            current_app.logger.info("Connected to Supabase database successfully")
+            return conn
+        except Exception as e:
+            # Fallback to SQLite if Supabase connection fails
+            current_app.logger.warning(f"Supabase connection failed: {e}. Falling back to SQLite.")
+            return sqlite3.connect('mood_app.db')
+    else:
+        # Use SQLite if no database URL is set
+        current_app.logger.warning("No database URL found. Using SQLite.")
+        return sqlite3.connect('mood_app.db')
 
 
 def login_required(view):
