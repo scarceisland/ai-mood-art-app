@@ -1,6 +1,7 @@
 import csv
 import io
 import os
+import psycopg2  # <-- ADD THIS IMPORT
 from collections import Counter
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -20,6 +21,23 @@ from .utils import get_db, login_required, admin_required
 
 bp = Blueprint("main", __name__)
 
+# ------------------------------
+# NEW FUNCTION: Supabase Connection
+# ------------------------------
+def get_supabase_db():
+    """Creates and returns a connection to the Supabase PostgreSQL database."""
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv("SUPABASE_HOST"),
+            database=os.getenv("SUPABASE_DB"),  # Usually 'postgres'
+            user=os.getenv("SUPABASE_USER"),    # Usually 'postgres'
+            password=os.getenv("SUPABASE_PASSWORD"),
+            port=5432
+        )
+        return conn
+    except Exception as e:
+        current_app.logger.error(f"Failed to connect to Supabase: {e}")
+        raise e  # Re-raise the exception to handle it in the route
 
 # ------------------------------
 # Dashboard Helper Functions
@@ -189,9 +207,13 @@ def feedback():
         }
     )
 
+    # MODIFIED SECTION: Using Supabase instead of SQLite
     try:
-        db = get_db()
-        db.execute(
+        # Get a connection to the Supabase database
+        conn = get_supabase_db()
+        cur = conn.cursor()
+        # Execute the INSERT command on Supabase
+        cur.execute(
             """
             INSERT INTO feedback (username, emotion, prompt, image_url, advice,
                                   predicted_correct, advice_ok, comments, created_at)
@@ -201,9 +223,11 @@ def feedback():
              form_data["advice"], form_data["predicted_correct"], form_data["advice_ok"],
              form_data["comments"], form_data["created_at"])
         )
-        db.commit()
+        conn.commit()
+        cur.close()
+        conn.close() # Close the Supabase connection
     except Exception as e:
-        current_app.logger.error(f"DB insert failed: {e}")
+        current_app.logger.error(f"Supabase DB insert failed: {e}")
         return "<p class='error'>Sorry, there was a problem saving your feedback.</p>"
 
     return "<p class='muted success'>Thank you for your feedback!</p>"
@@ -281,6 +305,8 @@ def admin():
 @admin_required
 def admin_feedback():
     """Displays all user feedback with charts and data."""
+    # NOTE: This still uses the local SQLite DB for reading.
+    # You might want to change this to get_supabase_db() later for consistency.
     db = get_db()
     feedback_rows = db.execute("SELECT * FROM feedback ORDER BY created_at DESC").fetchall()
 
