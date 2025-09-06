@@ -31,7 +31,7 @@ def get_dashboard_stats():
     total_images = db.execute("SELECT COUNT(*) FROM feedback WHERE image_url IS NOT NULL").fetchone()[0] or 0
     total_feedback = db.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] or 0
     try:
-        active_sessions = db.execute("SELECT COUNT(DISTINCT user) FROM logs WHERE timestamp > datetime('now', '-30 minutes')").fetchone()[0] or 0
+        active_sessions = db.execute("SELECT COUNT(DISTINCT username) FROM logs WHERE timestamp > NOW() - INTERVAL '30 minutes'").fetchone()[0] or 0
     except Exception:
         active_sessions = 0
     return {'total_users': total_users, 'total_images': total_images, 'total_feedback': total_feedback, 'active_sessions': active_sessions}
@@ -62,15 +62,15 @@ def get_user_activities():
     processed_users = []
     try:
         users = db.execute("""
-            SELECT user as username, MAX(timestamp) as last_login,
-                   CASE WHEN MAX(timestamp) > datetime('now', '-7 days') THEN 1 ELSE 0 END as active
-            FROM logs WHERE user != 'admin' AND event = 'login_success' GROUP BY user ORDER BY last_login DESC
+            SELECT username, MAX(timestamp) as last_login,
+                   CASE WHEN MAX(timestamp) > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END as active
+            FROM logs WHERE username != 'admin' AND event = 'login_success' GROUP BY username ORDER BY last_login DESC
         """).fetchall()
     except Exception:
         # Fallback to feedback table if logs table fails or doesn't have the user
         users = db.execute("""
             SELECT username, MAX(created_at) as last_login,
-                   CASE WHEN MAX(created_at) > datetime('now', '-7 days') THEN 1 ELSE 0 END as active
+                   CASE WHEN MAX(created_at) > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END as active
             FROM feedback WHERE username != 'admin' GROUP BY username ORDER BY last_login DESC
         """).fetchall()
 
@@ -195,9 +195,11 @@ def feedback():
             """
             INSERT INTO feedback (username, emotion, prompt, image_url, advice,
                                   predicted_correct, advice_ok, comments, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (username, *form_data.values())
+            (username, form_data["emotion"], form_data["prompt"], form_data["image_url"],
+             form_data["advice"], form_data["predicted_correct"], form_data["advice_ok"],
+             form_data["comments"], form_data["created_at"])
         )
         db.commit()
     except Exception as e:
@@ -295,7 +297,7 @@ def admin_feedback():
     mood_no = db.execute("SELECT COUNT(*) FROM feedback WHERE predicted_correct = 0").fetchone()[0] or 0
     advice_yes = db.execute("SELECT COUNT(*) FROM feedback WHERE advice_ok = 1").fetchone()[0] or 0
     advice_no = db.execute("SELECT COUNT(*) FROM feedback WHERE advice_ok = 0").fetchone()[0] or 0
-    daily_activity = db.execute("SELECT DATE(created_at) as date, COUNT(*) as count FROM feedback WHERE created_at >= date('now', '-7 days') GROUP BY DATE(created_at) ORDER BY date").fetchall()
+    daily_activity = db.execute("SELECT DATE(created_at) as date, COUNT(*) as count FROM feedback WHERE created_at >= CURRENT_DATE - INTERVAL '7 days' GROUP BY DATE(created_at) ORDER BY date").fetchall()
 
     emotion_data = {'labels': [e['emotion'].capitalize() for e in emotion_counts], 'values': [e['count'] for e in emotion_counts]}
     rating_data = {'mood_yes': mood_yes, 'mood_no': mood_no, 'advice_yes': advice_yes, 'advice_no': advice_no}
@@ -352,22 +354,22 @@ def admin_logs():
     params = []
 
     if filter_event:
-        query += " AND event LIKE ?"
+        query += " AND event LIKE %s"
         params.append(f"%{filter_event}%")
     if filter_user:
-        query += " AND user LIKE ?"
+        query += " AND username LIKE %s"
         params.append(f"%{filter_user}%")
     if filter_source:
-        query += " AND source LIKE ?"
+        query += " AND source LIKE %s"
         params.append(f"%{filter_source}%")
     if filter_start:
-        query += " AND (timestamp >= ? OR created_at >= ?)"
+        query += " AND (timestamp >= %s OR created_at >= %s)"
         params.extend([filter_start, filter_start])
     if filter_end:
-        query += " AND (timestamp <= ? OR created_at <= ?)"
+        query += " AND (timestamp <= %s OR created_at <= %s)"
         params.extend([filter_end, filter_end])
 
-    query += " ORDER BY COALESCE(created_at, timestamp) DESC LIMIT ?"
+    query += " ORDER BY COALESCE(created_at, timestamp) DESC LIMIT %s"
     params.append(limit_rows)
 
     db = get_db()
@@ -386,9 +388,9 @@ def admin_logs():
 def admin_view_user(username):
     """Displays a detailed view of a single user's activity."""
     db = get_db()
-    feedback = db.execute("SELECT * FROM feedback WHERE username = ? ORDER BY created_at DESC", (username,)).fetchall()
-    logs = db.execute("SELECT * FROM logs WHERE user = ? ORDER BY timestamp DESC", (username,)).fetchall()
-    last_login_row = db.execute("SELECT MAX(timestamp) as last_login FROM logs WHERE user = ? AND event = 'login_success'", (username,)).fetchone()
+    feedback = db.execute("SELECT * FROM feedback WHERE username = %s ORDER BY created_at DESC", (username,)).fetchall()
+    logs = db.execute("SELECT * FROM logs WHERE username = %s ORDER BY timestamp DESC", (username,)).fetchall()
+    last_login_row = db.execute("SELECT MAX(timestamp) as last_login FROM logs WHERE username = %s AND event = 'login_success'", (username,)).fetchone()
     last_login = datetime.fromisoformat(last_login_row['last_login']) if last_login_row and last_login_row['last_login'] else None
 
     # Process rows to convert date strings into datetime objects for the template
@@ -422,15 +424,20 @@ def admin_delete_user(username):
 def get_setting(key):
     """Fetches a setting value from the database."""
     db = get_db()
-    row = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    row = db.execute("SELECT value FROM settings WHERE key = %s", (key,)).fetchone()
     return row['value'] if row else None
 
 
 def set_setting(key, value):
     """Saves a setting value to the database."""
     db = get_db()
-    # Use INSERT OR REPLACE to either create or update the setting
-    db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
+    # Use PostgreSQL's UPSERT functionality
+    db.execute("""
+        INSERT INTO settings (key, value) 
+        VALUES (%s, %s)
+        ON CONFLICT (key) 
+        DO UPDATE SET value = EXCLUDED.value
+    """, (key, value))
     db.commit()
 
 
@@ -500,4 +507,3 @@ def export_data(export_format):
         return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name='mood_app_data.pdf')
 
     return "Invalid format", 400
-

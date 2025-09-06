@@ -28,8 +28,8 @@ def log_event(event: str, user: str | None = None, data: dict | None = None, sou
         db = get_db()
         db.execute(
             """
-            INSERT INTO logs (timestamp, event, user, source, data)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO logs (timestamp, event, username, source, data)
+            VALUES (%s, %s, %s, %s, %s)
             """,
             (
                 record["timestamp"],

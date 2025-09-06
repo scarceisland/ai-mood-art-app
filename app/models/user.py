@@ -131,8 +131,8 @@ def delete_user_data(username: str, db_conn) -> bool:
 
     # 2. Delete user data from the database
     try:
-        db_conn.execute("DELETE FROM feedback WHERE username = ?", (username,))
-        db_conn.execute("DELETE FROM logs WHERE user = ?", (username,))
+        db_conn.execute("DELETE FROM feedback WHERE username = %s", (username,))
+        db_conn.execute("DELETE FROM logs WHERE username = %s", (username,))
         db_conn.commit()
     except Exception:
         # If the database operation fails, the deletion is not successful.
@@ -142,4 +142,3 @@ def delete_user_data(username: str, db_conn) -> bool:
     refresh_users_cache()
 
     return True
-
