@@ -48,3 +48,9 @@ def admin_required(view):
 
     return wrapped
 
+def is_sqlite(db):
+    """Detect if the current DB connection is SQLite."""
+    try:
+        return db.execute("SELECT sqlite_version()").fetchone() is not None
+    except Exception:
+        return False

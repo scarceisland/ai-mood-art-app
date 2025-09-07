@@ -1,23 +1,42 @@
 import csv
 import io
 import os
-import psycopg2  # <-- ADD THIS IMPORT
 from collections import Counter
 from datetime import datetime, timedelta
 from io import BytesIO
 
 import pandas as pd
 from flask import (
-    Blueprint, render_template, request, redirect, url_for,
-    session, send_file, current_app, Response, flash
+    Blueprint,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    send_file,
+    current_app,
+    Response,
+    flash,
 )
 from werkzeug.security import generate_password_hash
 
+# Local imports
 from .image_generator import build_image_url
 from .logger import log_event
-from .models.user import verify_credentials, ADMIN_USERNAME, refresh_users_cache, delete_user_data
+from .models.user import (
+    verify_credentials,
+    ADMIN_USERNAME,
+    refresh_users_cache,
+    delete_user_data,
+)
 from .mood_detector import EMOTIONS, advice_for
-from .utils import get_db, login_required, admin_required
+from .utils import (
+    get_db,
+    login_required,
+    admin_required,
+    is_sqlite,
+)
+
 
 bp = Blueprint("main", __name__)
 
@@ -88,8 +107,9 @@ def get_user_activities():
         # Fallback to feedback table if logs table fails or doesn't have the user
         users = db.execute("""
             SELECT username, MAX(created_at) as last_login,
-                   CASE WHEN MAX(created_at) > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END as active
-            FROM feedback WHERE username != 'admin' GROUP BY username ORDER BY last_login DESC
+                   CASE WHEN MAX(created_at) > datetime('now', '-7 days') THEN 1 ELSE 0 END as active
+            FROM feedback WHERE username != 'admin'
+            GROUP BY username ORDER BY last_login DESC
         """).fetchall()
 
     for user in users:
@@ -448,22 +468,30 @@ def admin_delete_user(username):
 
 
 def get_setting(key):
-    """Fetches a setting value from the database."""
+    """Fetches a setting value from the database (SQLite or Postgres)."""
     db = get_db()
-    row = db.execute("SELECT value FROM settings WHERE key = %s", (key,)).fetchone()
+    if is_sqlite(db):
+        row = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    else:
+        row = db.execute("SELECT value FROM settings WHERE key = %s", (key,)).fetchone()
     return row['value'] if row else None
 
 
 def set_setting(key, value):
-    """Saves a setting value to the database."""
+    """Saves a setting value to the database (SQLite or Postgres)."""
     db = get_db()
-    # Use PostgreSQL's UPSERT functionality
-    db.execute("""
-        INSERT INTO settings (key, value) 
-        VALUES (%s, %s)
-        ON CONFLICT (key) 
-        DO UPDATE SET value = EXCLUDED.value
-    """, (key, value))
+    if is_sqlite(db):
+        db.execute("""
+            INSERT INTO settings (key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """, (key, value))
+    else:
+        db.execute("""
+            INSERT INTO settings (key, value)
+            VALUES (%s, %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+        """, (key, value))
     db.commit()
 
 
