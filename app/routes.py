@@ -5,11 +5,20 @@ from collections import Counter
 
 import pandas as pd
 from flask import (
-    Blueprint, render_template, request, redirect, url_for,
-    session, send_file, current_app, Response, flash
+    Blueprint,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    send_file,
+    current_app,
+    Response,
+    flash,
 )
 from sqlalchemy import text, func, or_
 
+<<<<<<< HEAD
 from app.db import db
 from .image_generator import build_image_url
 from .logger import log_event
@@ -23,6 +32,45 @@ bp = Blueprint("main", __name__)
 # Define Admin username from environment variable, for use in routes
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").lower()
 
+=======
+# Local imports
+from .image_generator import build_image_url
+from .logger import log_event
+from .models.user import (
+    verify_credentials,
+    ADMIN_USERNAME,
+    refresh_users_cache,
+    delete_user_data,
+)
+from .mood_detector import EMOTIONS, advice_for
+from .utils import (
+    get_db,
+    login_required,
+    admin_required,
+    is_sqlite,
+)
+
+
+bp = Blueprint("main", __name__)
+
+# ------------------------------
+# NEW FUNCTION: Supabase Connection
+# ------------------------------
+def get_supabase_db():
+    """Creates and returns a connection to the Supabase PostgreSQL database."""
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv("SUPABASE_HOST"),
+            database=os.getenv("SUPABASE_DB"),  # Usually 'postgres'
+            user=os.getenv("SUPABASE_USER"),    # Usually 'postgres'
+            password=os.getenv("SUPABASE_PASSWORD"),
+            port=5432
+        )
+        return conn
+    except Exception as e:
+        current_app.logger.error(f"Failed to connect to Supabase: {e}")
+        raise e  # Re-raise the exception to handle it in the route
+>>>>>>> 07fab75bfb58c355c4d78f7afa95984138d98e83
 
 # ------------------------------
 # Dashboard Helper Functions (Refactored for SQLAlchemy)
@@ -63,8 +111,28 @@ def get_recent_activities():
 
 
 def get_user_activities():
+<<<<<<< HEAD
     """Get user activity data using SQLAlchemy."""
     users = User.query.filter(User.username != ADMIN_USERNAME).all()
+=======
+    """Get user activity data, checking logs first and falling back to feedback."""
+    db = get_db()
+    processed_users = []
+    try:
+        users = db.execute("""
+            SELECT username, MAX(timestamp) as last_login,
+                   CASE WHEN MAX(timestamp) > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END as active
+            FROM logs WHERE username != 'admin' AND event = 'login_success' GROUP BY username ORDER BY last_login DESC
+        """).fetchall()
+    except Exception:
+        # Fallback to feedback table if logs table fails or doesn't have the user
+        users = db.execute("""
+            SELECT username, MAX(created_at) as last_login,
+                   CASE WHEN MAX(created_at) > datetime('now', '-7 days') THEN 1 ELSE 0 END as active
+            FROM feedback WHERE username != 'admin'
+            GROUP BY username ORDER BY last_login DESC
+        """).fetchall()
+>>>>>>> 07fab75bfb58c355c4d78f7afa95984138d98e83
 
     processed_users = []
     for user in users:
@@ -164,6 +232,7 @@ def generate():
 @login_required
 def feedback():
     """Handles user feedback submission."""
+<<<<<<< HEAD
     try:
         new_feedback = Feedback(
             username=session.get("username"),
@@ -192,6 +261,51 @@ def feedback():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"DB insert failed: {e}")
+=======
+    username = session.get("username")
+    form_data = {
+        "emotion": request.form.get("emotion"),
+        "prompt": request.form.get("prompt"),
+        "image_url": request.form.get("image_url"),
+        "advice": request.form.get("advice"),
+        "predicted_correct": int(request.form.get("predicted_correct", 0)),
+        "advice_ok": int(request.form.get("advice_ok", 0)),
+        "comments": request.form.get("comments", "").strip(),
+        "created_at": datetime.now().isoformat()
+    }
+
+    log_event(
+        "feedback_submit",
+        user=username,
+        data={
+            "emotion": form_data["emotion"],
+            "predicted_correct": form_data["predicted_correct"],
+            "advice_ok": form_data["advice_ok"],
+        }
+    )
+
+    # MODIFIED SECTION: Using Supabase instead of SQLite
+    try:
+        # Get a connection to the Supabase database
+        conn = get_supabase_db()
+        cur = conn.cursor()
+        # Execute the INSERT command on Supabase
+        cur.execute(
+            """
+            INSERT INTO feedback (username, emotion, prompt, image_url, advice,
+                                  predicted_correct, advice_ok, comments, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (username, form_data["emotion"], form_data["prompt"], form_data["image_url"],
+             form_data["advice"], form_data["predicted_correct"], form_data["advice_ok"],
+             form_data["comments"], form_data["created_at"])
+        )
+        conn.commit()
+        cur.close()
+        conn.close() # Close the Supabase connection
+    except Exception as e:
+        current_app.logger.error(f"Supabase DB insert failed: {e}")
+>>>>>>> 07fab75bfb58c355c4d78f7afa95984138d98e83
         return "<p class='error'>Sorry, there was a problem saving your feedback.</p>"
 
 
@@ -266,7 +380,21 @@ def admin():
 @admin_required
 def admin_feedback():
     """Displays all user feedback with charts and data."""
+<<<<<<< HEAD
     feedback_data = Feedback.query.order_by(Feedback.created_at.desc()).all()
+=======
+    # NOTE: This still uses the local SQLite DB for reading.
+    # You might want to change this to get_supabase_db() later for consistency.
+    db = get_db()
+    feedback_rows = db.execute("SELECT * FROM feedback ORDER BY created_at DESC").fetchall()
+
+    feedback_data = []
+    for row in feedback_rows:
+        processed_row = dict(row)
+        if processed_row.get('created_at'):
+            processed_row['created_at'] = datetime.fromisoformat(processed_row['created_at'])
+        feedback_data.append(processed_row)
+>>>>>>> 07fab75bfb58c355c4d78f7afa95984138d98e83
 
     # Chart data aggregation
     emotion_counts = db.session.query(Feedback.emotion, func.count(Feedback.id)).group_by(Feedback.emotion).all()
@@ -415,6 +543,7 @@ def admin_delete_user(username):
 
 
 def get_setting(key):
+<<<<<<< HEAD
     """Fetches a setting value from the database."""
     setting = Settings.query.get(key)
     return setting.value if setting else None
@@ -429,6 +558,33 @@ def set_setting(key, value):
         setting = Settings(key=key, value=value)
         db.session.add(setting)
     db.session.commit()
+=======
+    """Fetches a setting value from the database (SQLite or Postgres)."""
+    db = get_db()
+    if is_sqlite(db):
+        row = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    else:
+        row = db.execute("SELECT value FROM settings WHERE key = %s", (key,)).fetchone()
+    return row['value'] if row else None
+
+
+def set_setting(key, value):
+    """Saves a setting value to the database (SQLite or Postgres)."""
+    db = get_db()
+    if is_sqlite(db):
+        db.execute("""
+            INSERT INTO settings (key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """, (key, value))
+    else:
+        db.execute("""
+            INSERT INTO settings (key, value)
+            VALUES (%s, %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+        """, (key, value))
+    db.commit()
+>>>>>>> 07fab75bfb58c355c4d78f7afa95984138d98e83
 
 
 @bp.route("/admin/settings", methods=["GET", "POST"])

@@ -21,7 +21,8 @@ def create_app():
     app.config["DEBUG"] = (os.getenv("DEBUG", "true").lower() == "true")
     app.config["ADMIN_RESET_CODE"] = os.getenv("ADMIN_RESET_CODE", "")
 
-    # Configure the database using the DATABASE_URL from the environment
+    # Configure the database using the DATABASE_URL from the environment.
+    # This is the ONLY configuration needed for the database connection.
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -53,7 +54,6 @@ def create_app():
             admin_username = os.getenv("ADMIN_USERNAME", "admin")
 
             if not get_user(admin_username):
-                # Use ADMIN_PASSWORD from .env, or default to 'admin123' if not set
                 admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
                 admin_user = User(username=admin_username)
                 admin_user.set_password(admin_password)
