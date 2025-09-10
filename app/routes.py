@@ -1,91 +1,88 @@
-import csv
-import io
 import os
-from collections import Counter
 from datetime import datetime, timedelta
 from io import BytesIO
+from collections import Counter
 
 import pandas as pd
 from flask import (
     Blueprint, render_template, request, redirect, url_for,
     session, send_file, current_app, Response, flash
 )
-from werkzeug.security import generate_password_hash
+from sqlalchemy import text, func, or_
 
+from app.db import db
 from .image_generator import build_image_url
 from .logger import log_event
-from .models.user import verify_credentials, ADMIN_USERNAME, refresh_users_cache, delete_user_data
+from .models.user import User, verify_credentials, get_user, delete_user
+from .models.app_models import Feedback, Log, Settings
 from .mood_detector import EMOTIONS, advice_for
-from .utils import get_db, login_required, admin_required
+from .utils import login_required, admin_required
 
 bp = Blueprint("main", __name__)
 
+# Define Admin username from environment variable, for use in routes
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").lower()
+
 
 # ------------------------------
-# Dashboard Helper Functions
+# Dashboard Helper Functions (Refactored for SQLAlchemy)
 # ------------------------------
 def get_dashboard_stats():
-    """Get statistics for the admin dashboard."""
-    db = get_db()
-    total_users = db.execute("SELECT COUNT(DISTINCT username) FROM feedback WHERE username != 'admin'").fetchone()[0] or 0
-    total_images = db.execute("SELECT COUNT(*) FROM feedback WHERE image_url IS NOT NULL").fetchone()[0] or 0
-    total_feedback = db.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] or 0
-    try:
-        active_sessions = db.execute("SELECT COUNT(DISTINCT username) FROM logs WHERE timestamp > NOW() - INTERVAL '30 minutes'").fetchone()[0] or 0
-    except Exception:
-        active_sessions = 0
-    return {'total_users': total_users, 'total_images': total_images, 'total_feedback': total_feedback, 'active_sessions': active_sessions}
+    """Get statistics for the admin dashboard using SQLAlchemy."""
+    total_users = db.session.query(func.count(User.id)).filter(User.username != ADMIN_USERNAME).scalar()
+    total_images = db.session.query(func.count(Feedback.id)).filter(Feedback.image_url.isnot(None)).scalar()
+    total_feedback = db.session.query(func.count(Feedback.id)).scalar()
+
+    thirty_mins_ago = datetime.utcnow() - timedelta(minutes=30)
+    active_sessions = db.session.query(func.count(func.distinct(Log.username))).filter(
+        Log.timestamp > thirty_mins_ago).scalar()
+
+    return {
+        'total_users': total_users,
+        'total_images': total_images,
+        'total_feedback': total_feedback,
+        'active_sessions': active_sessions
+    }
 
 
 def get_recent_activities():
-    """Get recent user activities."""
-    db = get_db()
+    """Get recent user activities using SQLAlchemy."""
+    activities = Feedback.query.filter(Feedback.username != ADMIN_USERNAME) \
+        .order_by(Feedback.created_at.desc()) \
+        .limit(10).all()
+
     processed_activities = []
-    try:
-        activities = db.execute("""
-            SELECT username, created_at as date, 'Feedback submitted' as action, 'submitted' as status
-            FROM feedback WHERE username != 'admin' ORDER BY created_at DESC LIMIT 10
-        """).fetchall()
-        for activity in activities:
-            activity_dict = dict(activity)
-            if activity_dict.get('date'):
-                activity_dict['date'] = datetime.fromisoformat(activity_dict['date'])
-            processed_activities.append(activity_dict)
-    except Exception as e:
-        current_app.logger.error(f"Error fetching recent activities: {e}")
+    for activity in activities:
+        processed_activities.append({
+            'username': activity.username,
+            'date': activity.created_at,
+            'action': 'Feedback submitted',
+            'status': 'submitted'
+        })
     return processed_activities
 
 
 def get_user_activities():
-    """Get user activity data, checking logs first and falling back to feedback."""
-    db = get_db()
-    processed_users = []
-    try:
-        users = db.execute("""
-            SELECT username, MAX(timestamp) as last_login,
-                   CASE WHEN MAX(timestamp) > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END as active
-            FROM logs WHERE username != 'admin' AND event = 'login_success' GROUP BY username ORDER BY last_login DESC
-        """).fetchall()
-    except Exception:
-        # Fallback to feedback table if logs table fails or doesn't have the user
-        users = db.execute("""
-            SELECT username, MAX(created_at) as last_login,
-                   CASE WHEN MAX(created_at) > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END as active
-            FROM feedback WHERE username != 'admin' GROUP BY username ORDER BY last_login DESC
-        """).fetchall()
+    """Get user activity data using SQLAlchemy."""
+    users = User.query.filter(User.username != ADMIN_USERNAME).all()
 
+    processed_users = []
     for user in users:
-        user_dict = dict(user)
-        if user_dict.get('last_login'):
-            try:
-                user_dict['last_login'] = datetime.fromisoformat(user_dict['last_login'].replace('Z', '+00:00'))
-            except (ValueError, TypeError):
-                # Fallback for other common formats
-                try:
-                    user_dict['last_login'] = datetime.strptime(user_dict['last_login'], '%Y-%m-%d %H:%M:%S')
-                except (ValueError, TypeError):
-                    user_dict['last_login'] = None  # In case of parsing failure
-        processed_users.append(user_dict)
+        last_log = Log.query.filter_by(username=user.username, event='login_success') \
+            .order_by(Log.timestamp.desc()) \
+            .first()
+
+        last_login_time = last_log.timestamp if last_log else None
+        is_active = last_login_time > (datetime.utcnow() - timedelta(days=7)) if last_login_time else False
+
+        processed_users.append({
+            'username': user.username,
+            'last_login': last_login_time,
+            'active': is_active
+        })
+
+    # Sort users by last login, descending (newest first)
+    processed_users.sort(key=lambda x: x['last_login'] or datetime.min, reverse=True)
     return processed_users
 
 
@@ -167,46 +164,35 @@ def generate():
 @login_required
 def feedback():
     """Handles user feedback submission."""
-    username = session.get("username")
-    form_data = {
-        "emotion": request.form.get("emotion"),
-        "prompt": request.form.get("prompt"),
-        "image_url": request.form.get("image_url"),
-        "advice": request.form.get("advice"),
-        "predicted_correct": int(request.form.get("predicted_correct", 0)),
-        "advice_ok": int(request.form.get("advice_ok", 0)),
-        "comments": request.form.get("comments", "").strip(),
-        "created_at": datetime.now().isoformat()
-    }
-
-    log_event(
-        "feedback_submit",
-        user=username,
-        data={
-            "emotion": form_data["emotion"],
-            "predicted_correct": form_data["predicted_correct"],
-            "advice_ok": form_data["advice_ok"],
-        }
-    )
-
     try:
-        db = get_db()
-        db.execute(
-            """
-            INSERT INTO feedback (username, emotion, prompt, image_url, advice,
-                                  predicted_correct, advice_ok, comments, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (username, form_data["emotion"], form_data["prompt"], form_data["image_url"],
-             form_data["advice"], form_data["predicted_correct"], form_data["advice_ok"],
-             form_data["comments"], form_data["created_at"])
+        new_feedback = Feedback(
+            username=session.get("username"),
+            emotion=request.form.get("emotion"),
+            prompt=request.form.get("prompt"),
+            image_url=request.form.get("image_url"),
+            advice=request.form.get("advice"),
+            predicted_correct=int(request.form.get("predicted_correct", 0)),
+            advice_ok=int(request.form.get("advice_ok", 0)),
+            comments=request.form.get("comments", "").strip(),
+            created_at=datetime.utcnow()
         )
-        db.commit()
+        db.session.add(new_feedback)
+        db.session.commit()
+
+        log_event(
+            "feedback_submit",
+            user=session.get("username"),
+            data={
+                "emotion": new_feedback.emotion,
+                "predicted_correct": new_feedback.predicted_correct,
+                "advice_ok": new_feedback.advice_ok,
+            }
+        )
+        return "<p class='muted success'>Thank you for your feedback!</p>"
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"DB insert failed: {e}")
         return "<p class='error'>Sorry, there was a problem saving your feedback.</p>"
-
-    return "<p class='muted success'>Thank you for your feedback!</p>"
 
 
 # ------------------------------
@@ -225,13 +211,12 @@ def admin_login():
         else:
             log_event("admin_login_fail", user=ADMIN_USERNAME)
             return render_template("admin_login.html", admin_username=ADMIN_USERNAME, error="Invalid password.")
-
     return render_template("admin_login.html", admin_username=ADMIN_USERNAME)
 
 
 @bp.route("/admin-reset", methods=["GET", "POST"])
 def admin_reset():
-    """Handles the admin password reset functionality."""
+    """Handles the admin password reset functionality using the database."""
     if 'username' in session and session.get('username') != ADMIN_USERNAME:
         return redirect(url_for('main.home'))
 
@@ -250,62 +235,73 @@ def admin_reset():
             return render_template("admin_reset.html", error="Passwords do not match or are empty.")
 
         try:
-            project_root = os.path.abspath(os.path.join(current_app.root_path, ".."))
-            hash_file_path = os.path.join(project_root, "admin_pwd.hash")
-            new_hash = generate_password_hash(pw1)
-            with open(hash_file_path, "w", encoding="utf-8") as f:
-                f.write(new_hash)
-
-            refresh_users_cache()
-            log_event("admin_password_reset", user=ADMIN_USERNAME)
-            return render_template("admin_reset.html", msg="Password has been reset successfully.")
+            admin_user = get_user(ADMIN_USERNAME)
+            if admin_user:
+                admin_user.set_password(pw1)
+                db.session.commit()
+                log_event("admin_password_reset", user=ADMIN_USERNAME)
+                return render_template("admin_reset.html", msg="Password has been reset successfully.")
+            else:
+                return render_template("admin_reset.html", error="Admin user not found in the database.")
         except Exception as e:
+            db.session.rollback()
             log_event("admin_password_reset_fail", user=ADMIN_USERNAME, data={"error": str(e)})
-            return render_template("admin_reset.html", error="An error occurred.")
+            return render_template("admin_reset.html", error="An error occurred during password reset.")
 
     return render_template("admin_reset.html")
 
 
 # ------------------------------
-# Admin Pages
+# Admin Pages (Refactored for SQLAlchemy)
 # ------------------------------
 
 @bp.route("/admin")
 @admin_required
 def admin():
-    """Main admin page, redirects to the feedback view."""
-    return redirect(url_for("main.admin_feedback"))
+    """Main admin page, redirects to the dashboard."""
+    return redirect(url_for("main.admin_dashboard"))
 
 
 @bp.route("/admin/feedback")
 @admin_required
 def admin_feedback():
     """Displays all user feedback with charts and data."""
-    db = get_db()
-    feedback_rows = db.execute("SELECT * FROM feedback ORDER BY created_at DESC").fetchall()
-
-    feedback_data = []
-    for row in feedback_rows:
-        processed_row = dict(row)
-        if processed_row.get('created_at'):
-            processed_row['created_at'] = datetime.fromisoformat(processed_row['created_at'])
-        feedback_data.append(processed_row)
+    feedback_data = Feedback.query.order_by(Feedback.created_at.desc()).all()
 
     # Chart data aggregation
-    emotion_counts = db.execute("SELECT emotion, COUNT(*) as count FROM feedback WHERE emotion IS NOT NULL GROUP BY emotion").fetchall()
-    mood_yes = db.execute("SELECT COUNT(*) FROM feedback WHERE predicted_correct = 1").fetchone()[0] or 0
-    mood_no = db.execute("SELECT COUNT(*) FROM feedback WHERE predicted_correct = 0").fetchone()[0] or 0
-    advice_yes = db.execute("SELECT COUNT(*) FROM feedback WHERE advice_ok = 1").fetchone()[0] or 0
-    advice_no = db.execute("SELECT COUNT(*) FROM feedback WHERE advice_ok = 0").fetchone()[0] or 0
-    daily_activity = db.execute("SELECT DATE(created_at) as date, COUNT(*) as count FROM feedback WHERE created_at >= CURRENT_DATE - INTERVAL '7 days' GROUP BY DATE(created_at) ORDER BY date").fetchall()
+    emotion_counts = db.session.query(Feedback.emotion, func.count(Feedback.id)).group_by(Feedback.emotion).all()
+    mood_yes = Feedback.query.filter_by(predicted_correct=1).count()
+    mood_no = Feedback.query.filter_by(predicted_correct=0).count()
+    advice_yes = Feedback.query.filter_by(advice_ok=1).count()
+    advice_no = Feedback.query.filter_by(advice_ok=0).count()
 
-    emotion_data = {'labels': [e['emotion'].capitalize() for e in emotion_counts], 'values': [e['count'] for e in emotion_counts]}
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    daily_activity_raw = db.session.query(func.date(Feedback.created_at).label('activity_date'),
+                                          func.count(Feedback.id).label('count')) \
+        .filter(Feedback.created_at >= seven_days_ago) \
+        .group_by('activity_date') \
+        .order_by('activity_date').all()
+
+    emotion_data = {'labels': [e[0].capitalize() for e in emotion_counts], 'values': [e[1] for e in emotion_counts]}
     rating_data = {'mood_yes': mood_yes, 'mood_no': mood_no, 'advice_yes': advice_yes, 'advice_no': advice_no}
-    dates = [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(6, -1, -1)]
-    activity_counts = {d: 0 for d in dates}
-    for activity in daily_activity:
-        activity_counts[activity['date']] = activity['count']
-    activity_data = {'labels': [datetime.strptime(d, '%Y-%m-%d').strftime('%d/%m') for d in dates], 'values': [activity_counts[d] for d in dates]}
+
+    # --- DATE FORMAT CHANGE (YMD to DMY) ---
+    # Create a list of the last 7 dates as date objects for the activity chart
+    date_objects = [(datetime.utcnow().date() - timedelta(days=i)) for i in range(6, -1, -1)]
+
+    # Initialize counts for each date
+    activity_counts = {d: 0 for d in date_objects}
+
+    # Populate counts from the database query result
+    for activity in daily_activity_raw:
+        if activity.activity_date in activity_counts:
+            activity_counts[activity.activity_date] = activity.count
+
+    # Create labels in DD/MM format and their corresponding values
+    activity_data = {
+        'labels': [d.strftime('%d/%m') for d in date_objects],
+        'values': [activity_counts[d] for d in date_objects]
+    }
 
     return render_template(
         "admin_feedback.html",
@@ -338,48 +334,29 @@ def admin_dashboard():
 @admin_required
 def admin_logs():
     """Displays system logs with filtering and chart visualizations."""
+    query = Log.query
+
     filter_event = request.args.get('event', '')
     filter_user = request.args.get('user', '')
-    filter_source = request.args.get('source', '')
     filter_start = request.args.get('start', '')
     filter_end = request.args.get('end', '')
     limit_rows = int(request.args.get('rows', 500))
 
-    applied_filters = {
-        'event': filter_event, 'user': filter_user, 'source': filter_source,
-        'start': filter_start, 'end': filter_end, 'rows': limit_rows
-    }
-
-    query = "SELECT * FROM logs WHERE 1=1"
-    params = []
-
     if filter_event:
-        query += " AND event LIKE %s"
-        params.append(f"%{filter_event}%")
+        query = query.filter(Log.event.ilike(f"%{filter_event}%"))
     if filter_user:
-        query += " AND username LIKE %s"
-        params.append(f"%{filter_user}%")
-    if filter_source:
-        query += " AND source LIKE %s"
-        params.append(f"%{filter_source}%")
+        query = query.filter(Log.username.ilike(f"%{filter_user}%"))
     if filter_start:
-        query += " AND (timestamp >= %s OR created_at >= %s)"
-        params.extend([filter_start, filter_start])
+        query = query.filter(Log.timestamp >= filter_start)
     if filter_end:
-        query += " AND (timestamp <= %s OR created_at <= %s)"
-        params.extend([filter_end, filter_end])
+        query = query.filter(Log.timestamp <= filter_end)
 
-    query += " ORDER BY COALESCE(created_at, timestamp) DESC LIMIT %s"
-    params.append(limit_rows)
-
-    db = get_db()
-    log_rows = db.execute(query, params).fetchall()
-    logs_as_dicts = [dict(row) for row in log_rows]
+    log_rows = query.order_by(Log.timestamp.desc()).limit(limit_rows).all()
 
     return render_template(
         "logs.html",
-        rows=logs_as_dicts,
-        applied_filters=applied_filters
+        rows=log_rows,
+        applied_filters=request.args
     )
 
 
@@ -387,23 +364,23 @@ def admin_logs():
 @admin_required
 def admin_view_user(username):
     """Displays a detailed view of a single user's activity."""
-    db = get_db()
-    feedback = db.execute("SELECT * FROM feedback WHERE username = %s ORDER BY created_at DESC", (username,)).fetchall()
-    logs = db.execute("SELECT * FROM logs WHERE username = %s ORDER BY timestamp DESC", (username,)).fetchall()
-    last_login_row = db.execute("SELECT MAX(timestamp) as last_login FROM logs WHERE username = %s AND event = 'login_success'", (username,)).fetchone()
-    last_login = datetime.fromisoformat(last_login_row['last_login']) if last_login_row and last_login_row['last_login'] else None
+    user = get_user(username)
+    if not user:
+        flash(f"User '{username}' not found.", "error")
+        return redirect(url_for("main.admin_dashboard"))
 
-    # Process rows to convert date strings into datetime objects for the template
-    processed_feedback = [dict(row, created_at=datetime.fromisoformat(row['created_at'])) for row in feedback]
-    processed_logs = [dict(row, timestamp=datetime.fromisoformat(row['timestamp'])) for row in logs]
+    feedback = Feedback.query.filter_by(username=username).order_by(Feedback.created_at.desc()).all()
+    logs = Log.query.filter_by(username=username).order_by(Log.timestamp.desc()).all()
+    last_login_log = Log.query.filter_by(username=username, event='login_success').order_by(
+        Log.timestamp.desc()).first()
 
     user_data = {
         "username": username,
-        "feedback_count": len(processed_feedback),
-        "log_count": len(processed_logs),
-        "last_login": last_login,
-        "feedback": processed_feedback,
-        "logs": processed_logs
+        "feedback_count": len(feedback),
+        "log_count": len(logs),
+        "last_login": last_login_log.timestamp if last_login_log else None,
+        "feedback": feedback,
+        "logs": logs
     }
     return render_template("admin_user_view.html", user_data=user_data)
 
@@ -412,33 +389,46 @@ def admin_view_user(username):
 @admin_required
 def admin_delete_user(username):
     """Deletes a user and all their associated data."""
-    db = get_db()
-    if delete_user_data(username, db):
-        log_event("user_deleted", user=session.get("username"), data={"deleted_user": username})
-        flash(f"User '{username}' and all their data have been successfully deleted.", "success")
-    else:
+    if username.lower() == ADMIN_USERNAME:
         flash(f"Failed to delete user '{username}'. Admins cannot be deleted.", "error")
+        return redirect(url_for("main.admin_dashboard"))
+
+    try:
+        # Delete associated data first
+        Feedback.query.filter_by(username=username).delete()
+        Log.query.filter_by(username=username).delete()
+
+        # Now delete the user
+        if delete_user(username):
+            log_event("user_deleted", user=session.get("username"), data={"deleted_user": username})
+            flash(f"User '{username}' and all their data have been successfully deleted.", "success")
+        else:
+            flash(f"Could not find user '{username}' to delete.", "error")
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting user {username}: {e}")
+        flash(f"An error occurred while deleting user '{username}'.", "error")
+
     return redirect(url_for("main.admin_dashboard"))
 
 
 def get_setting(key):
     """Fetches a setting value from the database."""
-    db = get_db()
-    row = db.execute("SELECT value FROM settings WHERE key = %s", (key,)).fetchone()
-    return row['value'] if row else None
+    setting = Settings.query.get(key)
+    return setting.value if setting else None
 
 
 def set_setting(key, value):
-    """Saves a setting value to the database."""
-    db = get_db()
-    # Use PostgreSQL's UPSERT functionality
-    db.execute("""
-        INSERT INTO settings (key, value) 
-        VALUES (%s, %s)
-        ON CONFLICT (key) 
-        DO UPDATE SET value = EXCLUDED.value
-    """, (key, value))
-    db.commit()
+    """Saves a setting value to the database (upsert)."""
+    setting = Settings.query.get(key)
+    if setting:
+        setting.value = value
+    else:
+        setting = Settings(key=key, value=value)
+        db.session.add(setting)
+    db.session.commit()
 
 
 @bp.route("/admin/settings", methods=["GET", "POST"])
@@ -453,7 +443,6 @@ def admin_settings():
         success_message = "Settings have been saved successfully!"
 
     current_api_key = get_setting("CLIPDROP_API_KEY")
-
     return render_template(
         "admin_settings.html",
         clipdrop_api_key=current_api_key,
@@ -461,49 +450,32 @@ def admin_settings():
     )
 
 
-# ------------------------------
-# Export Routes
-# ------------------------------
-
 @bp.route('/admin/export/<export_format>', methods=["GET"])
 @admin_required
 def export_data(export_format):
-    """Handles exporting feedback data to CSV, Excel, or PDF."""
-    db = get_db()
+    """Handles exporting feedback data to CSV or Excel."""
     emotion_filter = request.args.get('emotion')
-    query = "SELECT * FROM feedback"
+    query = Feedback.query
     if emotion_filter:
-        query += f" WHERE emotion = '{emotion_filter}'"
+        query = query.filter_by(emotion=emotion_filter)
 
-    df = pd.read_sql(query, db)
+    df = pd.read_sql(query.statement, db.engine)
+
+    # --- DATE FORMAT CHANGE (YMD to DMY) ---
+    # Format the 'created_at' column to DD/MM/YYYY HH:MM:SS for the export
+    if 'created_at' in df.columns:
+        df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%d/%m/%Y %H:%M:%S')
 
     if export_format == 'csv':
-        return Response(df.to_csv(index=False), mimetype='text/csv', headers={'Content-Disposition': 'attachment;filename=mood_app_data.csv'})
+        return Response(df.to_csv(index=False), mimetype='text/csv',
+                        headers={'Content-Disposition': 'attachment;filename=mood_app_data.csv'})
     elif export_format == 'excel':
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name='Feedback')
-            summary_df = pd.DataFrame([{'Emotion': e, 'Count': c} for e, c in Counter(df['emotion']).items()])
-            summary_df.to_excel(writer, index=False, sheet_name='Summary')
         output.seek(0)
-        return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name='mood_app_data.xlsx')
-    elif export_format == 'pdf':
-        from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
-        buffer = BytesIO()
-        p = canvas.Canvas(buffer, pagesize=letter)
-        p.drawString(100, 750, "AI Art Mood App - Data Report")
-        p.drawString(100, 730, f"Emotion Filter: {emotion_filter or 'All'}")
-        p.drawString(100, 710, f"Total Records: {len(df)}")
-        y = 690
-        for _, row in df.iterrows():
-            if y < 100:
-                p.showPage()
-                y = 750
-            p.drawString(100, y, f"{row['created_at']} - {row['emotion']} - {row['prompt'][:50]}...")
-            y -= 20
-        p.save()
-        buffer.seek(0)
-        return send_file(buffer, mimetype='application/pdf', as_attachment=True, download_name='mood_app_data.pdf')
+        return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         as_attachment=True, download_name='mood_app_data.xlsx')
 
     return "Invalid format", 400
+
