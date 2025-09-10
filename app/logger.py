@@ -1,18 +1,15 @@
 import json
-import datetime as dt
+from datetime import datetime
 from flask import current_app
 from .db import db
 from .models.app_models import Log
 
 def log_event(event: str, user: str | None = None, data: dict | None = None, source: str | None = None) -> None:
-    """
-    Writes a single event to the `logs` database table using SQLAlchemy.
-    """
+    """Writes a single event to the `logs` database table using SQLAlchemy."""
     app = current_app._get_current_object()
-
     try:
         new_log = Log(
-            timestamp=dt.datetime.utcnow(),
+            timestamp=datetime.utcnow(),
             event=str(event),
             username="" if user is None else str(user),
             source="" if source is None else str(source),
