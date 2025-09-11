@@ -1,6 +1,7 @@
 import os
 import click
 from flask import Flask
+from sqlalchemy.exc import OperationalError
 from .db import db
 from .models.user import User
 
@@ -16,22 +17,29 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
 
-    # --- One-time Database Initialization (Workaround for Render Free Tier) ---
+    # --- Automatic Database Initialization with Error Handling ---
     with app.app_context():
-        # Import all models here so they are registered with SQLAlchemy
-        from .models import user, app_models
-        # Create tables if they don't exist
-        db.create_all()
+        try:
+            # Import all models here so they are registered with SQLAlchemy
+            from .models import user, app_models
+            # Create tables if they don't exist
+            db.create_all()
 
-        # Check if the admin user exists and create it if not
-        admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
-        if not User.query.filter_by(username=admin_username).first():
-            admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
-            admin_user = User(username=admin_username, is_admin=True)
-            admin_user.set_password(admin_pass)
-            db.session.add(admin_user)
-            db.session.commit()
-            print("Database tables created and admin user ensured.")
+            # Check if the admin user exists and create it if not
+            admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
+            if not User.query.filter_by(username=admin_username).first():
+                admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+                admin_user = User(username=admin_username, is_admin=True)
+                admin_user.set_password(admin_pass)
+                db.session.add(admin_user)
+                db.session.commit()
+                print("Database tables created and admin user ensured.")
+        except OperationalError as e:
+            # This can happen on the first startup if the DB isn't ready.
+            # The app will crash, Render will restart it, and it will succeed on the next try.
+            print(f"Database initialization failed, likely a startup race condition: {e}")
+            # Re-raising the error ensures Render restarts the service.
+            raise
 
     # Register blueprints
     from . import routes
