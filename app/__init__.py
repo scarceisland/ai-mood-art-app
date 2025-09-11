@@ -1,4 +1,5 @@
 import os
+import time
 import click
 from flask import Flask
 from sqlalchemy.exc import OperationalError
@@ -17,29 +18,39 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
 
-    # --- Automatic Database Initialization with Error Handling ---
+    # --- Automatic Database Initialization with Retry Logic ---
     with app.app_context():
-        try:
-            # Import all models here so they are registered with SQLAlchemy
-            from .models import user, app_models
-            # Create tables if they don't exist
-            db.create_all()
+        # Retry connecting to the database a few times to handle startup race conditions.
+        max_retries = 5
+        retry_delay = 2  # seconds
+        for attempt in range(max_retries):
+            try:
+                # Import all models here so they are registered with SQLAlchemy
+                from .models import user, app_models
+                # Create tables if they don't exist
+                db.create_all()
 
-            # Check if the admin user exists and create it if not
-            admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
-            if not User.query.filter_by(username=admin_username).first():
-                admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
-                admin_user = User(username=admin_username, is_admin=True)
-                admin_user.set_password(admin_pass)
-                db.session.add(admin_user)
-                db.session.commit()
-                print("Database tables created and admin user ensured.")
-        except OperationalError as e:
-            # This can happen on the first startup if the DB isn't ready.
-            # The app will crash, Render will restart it, and it will succeed on the next try.
-            print(f"Database initialization failed, likely a startup race condition: {e}")
-            # Re-raising the error ensures Render restarts the service.
-            raise
+                # Check if the admin user exists and create it if not
+                admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
+                if not User.query.filter_by(username=admin_username).first():
+                    admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+                    admin_user = User(username=admin_username, is_admin=True)
+                    admin_user.set_password(admin_pass)
+                    db.session.add(admin_user)
+                    db.session.commit()
+                    print("Database tables created and admin user ensured.")
+
+                # If we get here, the connection was successful, so we can exit the loop.
+                print("Database connection successful.")
+                break
+            except OperationalError as e:
+                print(f"Database connection attempt {attempt + 1}/{max_retries} failed.")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    print("Max retries reached. Could not connect to the database.")
+                    raise
 
     # Register blueprints
     from . import routes
