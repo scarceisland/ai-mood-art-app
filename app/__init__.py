@@ -1,85 +1,58 @@
-# app/__init__.py
 import os
-from pathlib import Path
-from flask import Flask
-from .models.db import db  # ✅ correct place
-from dotenv import load_dotenv
 import click
-
+from flask import Flask
+from .db import db
+from .models.user import User
 
 def create_app():
     """Create and configure an instance of the Flask application."""
-    project_root = Path(__file__).resolve().parents[1]
-    load_dotenv(project_root / ".env")
-
-    app = Flask(
-        __name__,
-        static_folder=str(project_root / "static"),
-        template_folder=str(project_root / "templates"),
-    )
+    app = Flask(__name__, instance_relative_config=True)
 
     # --- Core Application Configuration ---
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev")
-    app.config["DEBUG"] = (os.getenv("DEBUG", "true").lower() == "true")
-    app.config["ADMIN_RESET_CODE"] = os.getenv("ADMIN_RESET_CODE", "")
-
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-    # --- Initialize Extensions ---
-    db.init_app(app)  # ✅ just use the one from .models.db
+    # Initialize extensions
+    db.init_app(app)
 
-    # Ensure the instance folder exists
-    os.makedirs(app.instance_path, exist_ok=True)
+    # --- One-time Database Initialization (Workaround for Render Free Tier) ---
+    with app.app_context():
+        # Import all models here so they are registered with SQLAlchemy
+        from .models import user, app_models
+        # Create tables if they don't exist
+        db.create_all()
 
-    # Session cookies config
-    app.config.update(
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="Lax",
-    )
+        # Check if the admin user exists and create it if not
+        admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
+        if not User.query.filter_by(username=admin_username).first():
+            admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+            admin_user = User(username=admin_username, is_admin=True)
+            admin_user.set_password(admin_pass)
+            db.session.add(admin_user)
+            db.session.commit()
+            print("Database tables created and admin user ensured.")
 
-    # Register routes
-    from .routes import bp as main_bp
-    app.register_blueprint(main_bp)
+    # Register blueprints
+    from . import routes
+    app.register_blueprint(routes.bp)
 
-    # --- Database CLI Commands ---
-    @app.cli.command("init-db")
-    def init_db_command():
-        """Clear existing data and create new tables, including the admin user."""
-        with app.app_context():
-            db.create_all()
-            from .models.user import User, get_user
-
-            admin_username = os.getenv("ADMIN_USERNAME", "admin")
-
-            if not get_user(admin_username):
-                admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
-                admin_user = User(username=admin_username)
-                admin_user.set_password(admin_password)
-                db.session.add(admin_user)
-                db.session.commit()
-                click.echo(f"Admin user '{admin_username}' created.")
-            else:
-                click.echo(f"Admin user '{admin_username}' already exists.")
-
-            click.echo("Initialized the database.")
-
-    @app.cli.command("add-user")
+    # --- Optional CLI Commands (for local development) ---
+    @click.command("add-user")
     @click.argument("username")
     @click.argument("password")
     def add_user_command(username, password):
-        """Creates a new user with a hashed password."""
+        """Creates a new user with a password."""
         with app.app_context():
-            from .models.user import User, get_user
-
-            if get_user(username):
+            if User.query.filter_by(username=username).first():
                 click.echo(f"Error: User '{username}' already exists.")
                 return
-
-            new_user = User(username=username)
+            new_user = User(username=username, is_admin=False)
             new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
-            click.echo(f"User '{username}' was created successfully.")
+            click.echo(f"User '{username}' created successfully.")
+
+    app.cli.add_command(add_user_command)
 
     return app
