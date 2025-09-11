@@ -1,22 +1,36 @@
 # user.py
+import os
 import psycopg2
 from psycopg2 import pool, sql
 from werkzeug.security import generate_password_hash, check_password_hash
+import urllib.parse
 
-# Database connection parameters
-DB_CONFIG = {
-    'dbname': 'your_db_name',
-    'user': 'your_db_user',
-    'password': 'your_db_password',
-    'host': 'localhost',
-    'port': '5432',
-}
+# Get database URL from environment variable (Render provides DATABASE_URL)
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
-# Initialize connection pool
-connection_pool = psycopg2.pool.SimpleConnectionPool(
-    1, 10,  # minconn, maxconn
-    **DB_CONFIG
-)
+if DATABASE_URL:
+    # Parse the DATABASE_URL for connection parameters
+    result = urllib.parse.urlparse(DATABASE_URL)
+
+    connection_pool = psycopg2.pool.SimpleConnectionPool(
+        minconn=1,
+        maxconn=10,
+        host=result.hostname,
+        database=result.path[1:],  # Remove leading slash
+        user=result.username,
+        password=result.password,
+        port=result.port
+    )
+else:
+    # Fallback for local development
+    DB_CONFIG = {
+        'dbname': 'your_local_db',
+        'user': 'your_username',
+        'password': 'your_password',
+        'host': 'localhost',
+        'port': '5432',
+    }
+    connection_pool = psycopg2.pool.SimpleConnectionPool(1, 10, **DB_CONFIG)
 
 
 class PooledConnection:
