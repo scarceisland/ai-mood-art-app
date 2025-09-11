@@ -1,6 +1,8 @@
+# app/__init__.py
 import os
 from pathlib import Path
 from flask import Flask
+from .models.db import db  # ✅ correct place
 from dotenv import load_dotenv
 import click
 
@@ -21,25 +23,22 @@ def create_app():
     app.config["DEBUG"] = (os.getenv("DEBUG", "true").lower() == "true")
     app.config["ADMIN_RESET_CODE"] = os.getenv("ADMIN_RESET_CODE", "")
 
-    # Configure the database using the DATABASE_URL from the environment.
-    # This is the ONLY configuration needed for the database connection.
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # --- Initialize Extensions ---
-    from .db import db
-    db.init_app(app)
+    db.init_app(app)  # ✅ just use the one from .models.db
 
-    # Ensure the instance folder exists for any fallback configurations
+    # Ensure the instance folder exists
     os.makedirs(app.instance_path, exist_ok=True)
 
-    # Configure session cookies for security
+    # Session cookies config
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
     )
 
-    # Register blueprints to organize routes
+    # Register routes
     from .routes import bp as main_bp
     app.register_blueprint(main_bp)
 
@@ -84,4 +83,3 @@ def create_app():
             click.echo(f"User '{username}' was created successfully.")
 
     return app
-
