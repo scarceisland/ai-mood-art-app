@@ -2,7 +2,7 @@ import os
 import time
 import click
 from flask import Flask
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, IntegrityError
 from .db import db
 from .models.user import User
 
@@ -20,7 +20,6 @@ def create_app():
 
     # --- Automatic Database Initialization with Retry Logic ---
     with app.app_context():
-        # Retry connecting to the database a few times to handle startup race conditions.
         max_retries = 5
         retry_delay = 2  # seconds
         for attempt in range(max_retries):
@@ -30,20 +29,25 @@ def create_app():
                 # Create tables if they don't exist
                 db.create_all()
 
-                # Check if the admin user exists and create it if not
+                # Attempt to create the admin user
                 admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
-                if not User.query.filter_by(username=admin_username).first():
-                    admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
-                    admin_user = User(username=admin_username, is_admin=True)
-                    admin_user.set_password(admin_pass)
-                    db.session.add(admin_user)
-                    db.session.commit()
-                    print("Database tables created and admin user ensured.")
+                admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+                admin_user = User(username=admin_username, is_admin=True)
+                admin_user.set_password(admin_pass)
+                db.session.add(admin_user)
+                db.session.commit()
+                print("Admin user created successfully.")
 
-                # If we get here, the connection was successful, so we can exit the loop.
-                print("Database connection successful.")
+                # If we get here, initialization was successful.
+                print("Database tables created and admin user ensured.")
+                break
+            except IntegrityError:
+                # This happens if the admin user already exists, which is fine.
+                db.session.rollback()
+                print("Admin user already exists. Initialization complete.")
                 break
             except OperationalError as e:
+                db.session.rollback()
                 print(f"Database connection attempt {attempt + 1}/{max_retries} failed.")
                 if attempt < max_retries - 1:
                     print(f"Retrying in {retry_delay} seconds...")
@@ -51,6 +55,10 @@ def create_app():
                 else:
                     print("Max retries reached. Could not connect to the database.")
                     raise
+            except Exception as e:
+                db.session.rollback()
+                print(f"An unexpected error occurred during initialization: {e}")
+                raise
 
     # Register blueprints
     from . import routes
