@@ -24,27 +24,28 @@ def create_app():
         retry_delay = 2  # seconds
         for attempt in range(max_retries):
             try:
-                # Import all models here so they are registered with SQLAlchemy
+                # STEP 1: Create all tables and commit that change first.
                 from .models import user, app_models
-                # Create tables if they don't exist
                 db.create_all()
-
-                # Attempt to create the admin user
-                admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
-                admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
-                admin_user = User(username=admin_username, is_admin=True)
-                admin_user.set_password(admin_pass)
-                db.session.add(admin_user)
                 db.session.commit()
-                print("Admin user created successfully.")
+                print("Database tables created or already exist.")
+
+                # STEP 2: Now that tables are guaranteed to exist, attempt to create the admin user.
+                try:
+                    admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
+                    admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+                    admin_user = User(username=admin_username, is_admin=True)
+                    admin_user.set_password(admin_pass)
+                    db.session.add(admin_user)
+                    db.session.commit()
+                    print("Admin user created successfully.")
+                except IntegrityError:
+                    # This is expected if the admin user already exists.
+                    db.session.rollback()
+                    print("Admin user already exists.")
 
                 # If we get here, initialization was successful.
-                print("Database tables created and admin user ensured.")
-                break
-            except IntegrityError:
-                # This happens if the admin user already exists, which is fine.
-                db.session.rollback()
-                print("Admin user already exists. Initialization complete.")
+                print("Database initialization complete.")
                 break
             except OperationalError as e:
                 db.session.rollback()
