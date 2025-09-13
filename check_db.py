@@ -6,6 +6,7 @@ Run this with: railway run python check_db.py
 
 import os
 import sys
+from sqlalchemy import text  # ← ADD THIS IMPORT
 
 # Add the current directory to Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -24,9 +25,9 @@ def check_database():
         with app.app_context():
             print("🔍 Checking database connection...")
 
-            # Test basic connection
+            # Test basic connection - USE text() WRAPPER
             try:
-                result = db.session.execute('SELECT 1')
+                result = db.session.execute(text('SELECT 1'))  # ← ADD text() HERE
                 print("✅ Database connection successful")
             except Exception as e:
                 print(f"❌ Database connection failed: {e}")
@@ -42,14 +43,14 @@ def check_database():
                 print(f"❌ Table creation failed: {e}")
                 return False
 
-            # Check what tables exist
+            # Check what tables exist - USE text() WRAPPER
             print("🔍 Checking existing tables...")
             try:
-                result = db.session.execute("""
+                result = db.session.execute(text("""
                     SELECT table_name 
                     FROM information_schema.tables 
                     WHERE table_schema = 'public'
-                """)
+                """))  # ← ADD text() HERE
                 tables = [row[0] for row in result]
                 print(f"✅ Tables in database: {tables}")
 
