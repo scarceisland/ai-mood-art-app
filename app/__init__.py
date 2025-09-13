@@ -4,7 +4,7 @@ import click
 from flask import Flask
 from sqlalchemy.exc import OperationalError, IntegrityError
 from .db import db
-from .models.user import User
+
 
 def create_app():
     """Create and configure an instance of the Flask application."""
@@ -32,13 +32,18 @@ def create_app():
 
                 # STEP 2: Now that tables are guaranteed to exist, attempt to create the admin user.
                 try:
+                    from .models.user import User
                     admin_username = os.getenv("ADMIN_USERNAME", "admin").lower()
                     admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
-                    admin_user = User(username=admin_username, is_admin=True)
-                    admin_user.set_password(admin_pass)
-                    db.session.add(admin_user)
-                    db.session.commit()
-                    print("Admin user created successfully.")
+                    if not User.query.filter_by(username=admin_username).first():
+                        admin_user = User(username=admin_username, is_admin=True)
+                        admin_user.set_password(admin_pass)
+                        db.session.add(admin_user)
+                        db.session.commit()
+                        print("Admin user created successfully.")
+                    else:
+                        print("Admin user already exists.")
+
                 except IntegrityError:
                     # This is expected if the admin user already exists.
                     db.session.rollback()
@@ -55,11 +60,11 @@ def create_app():
                     time.sleep(retry_delay)
                 else:
                     print("Max retries reached. Could not connect to the database.")
-                    raise
+
             except Exception as e:
                 db.session.rollback()
                 print(f"An unexpected error occurred during initialization: {e}")
-                raise
+
 
     # Register blueprints
     from . import routes
@@ -72,6 +77,7 @@ def create_app():
     def add_user_command(username, password):
         """Creates a new user with a password."""
         with app.app_context():
+            from .models.user import User
             if User.query.filter_by(username=username).first():
                 click.echo(f"Error: User '{username}' already exists.")
                 return
