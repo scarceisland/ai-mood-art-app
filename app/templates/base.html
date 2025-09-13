@@ -33,7 +33,7 @@
           <a href="{{ url_for('main.logout') }}"><button class="secondary">Logout</button></a>
         {% else %}
           <!-- Shortcuts when logged out -->
-          <a class="chip" href="{{ url_for('main.admin_login') }}">Admin</a>
+          <a class="chip" href="{{ url_for('main.login') }}">Admin</a>
           {# --- THIS LINE HAS BEEN CORRECTED --- #}
           <a class="chip" href="{{ url_for('main.login') }}">Users</a>
         {% endif %}
