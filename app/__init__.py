@@ -3,6 +3,7 @@
 import os
 import click
 from flask import Flask
+from flask_migrate import Migrate  # Add this import
 from .db import db  # Assuming you have db = SQLAlchemy() in app/db.py
 
 
@@ -19,6 +20,9 @@ def create_app():
 
     # Initialize extensions
     db.init_app(app)
+
+    # Initialize Flask-Migrate
+    migrate = Migrate(app, db)  # Add this line after db initialization
 
     # --- Blueprints ---
     from . import routes
