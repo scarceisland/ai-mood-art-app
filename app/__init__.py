@@ -3,8 +3,7 @@
 import os
 import click
 from flask import Flask
-from flask_migrate import Migrate  # Add this import
-from .db import db  # Assuming you have db = SQLAlchemy() in app/db.py
+from .db import db
 
 
 def create_app():
@@ -12,26 +11,33 @@ def create_app():
     app = Flask(__name__, instance_relative_config=True)
 
     # --- Core Application Configuration ---
+    # Get database URL from environment variable with fallback
+    database_url = os.getenv("DATABASE_URL")
+
+    # If DATABASE_URL is not set or is a Railway internal URL, use SQLite for local development
+    if not database_url or "railway.internal" in database_url:
+        # Ensure instance folder exists
+        os.makedirs(app.instance_path, exist_ok=True)
+        database_url = f"sqlite:///{os.path.join(app.instance_path, 'app.db')}"
+        print(f"Using SQLite database for local development: {database_url}")
+
     app.config.from_mapping(
-        SECRET_KEY=os.getenv("SECRET_KEY"),
-        SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL"),
+        SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret-key"),
+        SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
     )
 
     # Initialize extensions
     db.init_app(app)
 
-    # Initialize Flask-Migrate
-    migrate = Migrate(app, db)  # Add this line after db initialization
+    # Import models to ensure they are registered with SQLAlchemy
+    from .models import app_models, user
 
     # --- Blueprints ---
     from . import routes
     app.register_blueprint(routes.bp)
 
-    # Note: If your blueprint is named 'main', use routes.main
-
     # --- CLI Commands ---
-    # This is the new, recommended way to set up your database.
     @app.cli.command("init-db")
     def init_db_command():
         """Clear existing data and create new tables and admin user."""
