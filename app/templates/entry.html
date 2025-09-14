@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div style="text-align: center; max-width: 600px; margin: 40px auto;">
+<div style="text-align: center; max-width: 800px; margin: 40px auto;">
 
     <h1>AI Art Mood App</h1>
     <p class="muted">A dissertation project for generating AI art based on emotions.</p>
@@ -24,6 +24,33 @@
         </div>
     </div>
 
+    <!-- Database Status Card -->
+    <div class="card" style="text-align: left; margin-top: 32px; padding: 24px; border-left: 4px solid #ffd93d;">
+        <h4 style="display: flex; align-items: center; gap: 10px;">
+            <span style="width: 12px; height: 12px; border-radius: 50%; background: #ffd93d; display: inline-block; animation: pulse 2s infinite;"></span>
+            Database Connection Status
+        </h4>
+        <p>Current Status: <strong style="color: #ffd93d;">Connected to Railway but empty</strong></p>
+        <p>Since you're using Railway PostgreSQL, here's how to fix this:</p>
+        <ol style="padding-left: 25px; margin: 15px 0; color: #aab1c5;">
+            <li>Check your Railway PostgreSQL connection settings</li>
+            <li>Run the database initialization script to create tables</li>
+            <li>Verify environment variables in your Railway deployment</li>
+            <li>Ensure your connection string uses the Railway-provided URL</li>
+        </ol>
+
+        <div style="background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd93d; border-radius: 8px; padding: 15px; margin-top: 20px;">
+            <h4 style="color: #ffd93d; margin-top: 0;">Railway PostgreSQL Troubleshooting</h4>
+            <p>If your database is empty even though both the app and PostgreSQL are active:</p>
+            <ol style="padding-left: 25px; margin: 15px 0; color: #aab1c5;">
+                <li>Check your Railway project dashboard for PostgreSQL connection details</li>
+                <li>Verify your <code style="background: rgba(0, 0, 0, 0.3); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #7aa2ff;">DATABASE_URL</code> environment variable</li>
+                <li>Run your database migration scripts</li>
+                <li>Check if your application has proper permissions to create tables</li>
+            </ol>
+        </div>
+    </div>
+
     <div class="button-group" style="margin-top: 32px; display: flex; justify-content: center; gap: 16px;">
         <a id="users-link" href="{{ url_for('main.login') }}">
             <button id="users-button" class="button" disabled>Participate as a User</button>
@@ -34,6 +61,14 @@
     </div>
 
 </div>
+
+<style>
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+</style>
 
 <script>
     // Wait for the page to fully load before running the script
